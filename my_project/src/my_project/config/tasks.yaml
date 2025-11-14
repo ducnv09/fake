@@ -1,0 +1,411 @@
+analysis_task:
+  description: >
+    You are conducting a requirements gathering session with a user who wants to build software.
+
+    Current conversation context:
+    {conversation_context}
+
+    User's latest message:
+    {user_message}
+
+    Current turn: {turn_count}
+    Total requirements collected: {total_requirements}
+
+    CRITICAL: You MUST follow these steps IN ORDER:
+
+    STEP 1 - EXTRACT REQUIREMENTS:
+    Analyze the user's message and identify ANY requirements mentioned:
+    - Problem & Goals: What problem are they solving? What are the business objectives?
+    - Users & Stakeholders: Who will use this? What are their roles and needs?
+    - Features & Scope: What features do they need? What's in/out of scope?
+
+    STEP 2 - SAVE TO STATE (MANDATORY):
+    For EACH requirement you identified, you MUST call the State Manager Tool:
+    Tool: State Manager Tool
+    Parameters:
+      - action: 'add_requirement'
+      - category: 'problem_goals' OR 'users_stakeholders' OR 'features_scope'
+      - content: 'the specific requirement in clear, concise language'
+
+    Example: If user says "I want to build an e-commerce website for selling books"
+    You MUST call:
+    1. State Manager Tool(action='add_requirement', category='problem_goals', content='Build an e-commerce platform for online book sales')
+    2. State Manager Tool(action='add_requirement', category='features_scope', content='E-commerce functionality for book transactions')
+
+    STEP 3 - RESPOND TO USER:
+    After saving requirements, respond conversationally:
+    - Acknowledge what they shared
+    - Confirm your understanding
+    - CRITICAL: If turn >= 2 OR total_requirements >= 8, DO NOT ask any questions. Just thank them and summarize.
+    - Otherwise: You may ask 1 clarifying question if needed
+
+    IMPORTANT: You MUST use the State Manager Tool for EVERY requirement you identify.
+    Do NOT skip this step. The tool calls should happen BEFORE you generate your response.
+
+    If the user's message contains NO new requirements (e.g., just "ok", "yes", "that's enough"),
+    you should NOT call the tool, just respond conversationally.
+  expected_output: >
+    Your response MUST follow this format:
+
+    [REQUIREMENTS SAVED: X items]
+    (Only include this line if you saved requirements using the tool. X = number of tool calls made)
+
+    Then provide a conversational response that:
+    1. Acknowledges what the user shared
+    2. Confirms your understanding of key points
+    3. Asks 1-2 specific follow-up questions to gather more details
+
+    Example output:
+    "[REQUIREMENTS SAVED: 3 items]
+
+    Thank you for sharing that you want to build an e-commerce website for selling books. I understand your goal is to create an online platform for book sales with shopping cart and payment features.
+
+    Could you tell me more about who will be using this system? Also, what payment methods would you like to support?"
+
+    CRITICAL: If you identified requirements, you MUST include the [REQUIREMENTS SAVED: X items] line at the start.
+  agent: business_analyst
+
+phase_evaluation_task:
+  description: >
+    Evaluate if the Analysis phase has collected sufficient requirements to proceed to the Solution phase.
+
+    CRITICAL: You MUST use the State Manager Tool to check actual requirements. DO NOT rely on the summary text below.
+
+    STEP 1 - CHECK COMPLETENESS (MANDATORY):
+    You MUST call the State Manager Tool:
+    Tool: State Manager Tool
+    Parameters:
+      - action: 'check_complete'
+
+    This will return the ACTUAL count of requirements in each category.
+
+    STEP 2 - ANALYZE THE TOOL RESULT:
+    Based on the tool's response, evaluate:
+    - Do we have at least 2 requirements in each category (problem_goals, users_stakeholders, features_scope)?
+    - OR do we have at least 8 total requirements across all categories?
+    - Are the requirements specific and actionable?
+
+    STEP 3 - MAKE DECISION:
+    - If criteria met: DECISION: READY
+    - If criteria NOT met: DECISION: NOT_READY
+
+    IMPORTANT: Base your decision ONLY on the tool result, NOT on the text summary below.
+
+    Current requirements summary (for reference only):
+    {requirements_summary}
+  expected_output: >
+    A clear decision in this format:
+
+    DECISION: [READY or NOT_READY]
+
+    REASONING: [2-3 sentences explaining why, citing ACTUAL numbers from the tool]
+
+    NEXT_STEPS: [What should happen next - either move to Solution phase or what questions still need answers]
+  agent: phase_coordinator
+
+solution_design_task:
+  description: >
+    Design a comprehensive business solution based on the collected requirements.
+
+    Requirements to analyze:
+    {requirements_summary}
+
+    CRITICAL: You MUST follow these steps IN ORDER:
+
+    STEP 1 - ANALYZE REQUIREMENTS:
+    Review all requirements and understand:
+    - What problem needs to be solved
+    - Who will use the system
+    - What features are needed
+
+    STEP 2 - DESIGN FRONTEND COMPONENTS (MANDATORY):
+    For EACH user-facing page/screen needed, you MUST call the Solution Manager Tool:
+    Tool: Solution Manager Tool
+    Parameters:
+      - action: 'add_frontend'
+      - component_data: JSON string with structure:
+        {
+          "name": "Component Name (e.g., Home Page, Product Detail Page)",
+          "description": "What this page/screen does",
+          "features": ["Feature 1", "Feature 2", ...],
+          "user_interactions": ["User can do X", "User can do Y", ...]
+        }
+
+    Example for e-commerce book website:
+    1. Solution Manager Tool(action='add_frontend', component_data='{"name": "Home Page", "description": "Main landing page displaying book catalog", "features": ["Book listing", "Search bar", "Category filters", "Featured books"], "user_interactions": ["Browse books", "Search by title/author", "Filter by category", "Click to view details"]}')
+    2. Solution Manager Tool(action='add_frontend', component_data='{"name": "Product Detail Page", "description": "Detailed view of a single book", "features": ["Book information", "Price display", "Add to cart button", "Reviews section"], "user_interactions": ["View book details", "Add to cart", "Read reviews", "Write review"]}')
+
+    STEP 3 - DESIGN BACKEND COMPONENTS (MANDATORY):
+    For EACH backend service/API needed, you MUST call the Solution Manager Tool:
+    Tool: Solution Manager Tool
+    Parameters:
+      - action: 'add_backend'
+      - component_data: JSON string with structure:
+        {
+          "name": "Component Name (e.g., Product API, Order Management)",
+          "description": "What this backend component does",
+          "endpoints": ["GET /api/products", "POST /api/orders", ...],
+          "business_logic": ["Logic 1", "Logic 2", ...],
+          "data_models": ["Model 1", "Model 2", ...]
+        }
+
+    Example:
+    Solution Manager Tool(action='add_backend', component_data='{"name": "Product Management API", "description": "Handles all product-related operations", "endpoints": ["GET /api/products - List all products", "GET /api/products/:id - Get product details", "POST /api/products - Create product (admin)", "PUT /api/products/:id - Update product (admin)"], "business_logic": ["Product search and filtering", "Inventory tracking", "Price calculation"], "data_models": ["Product (id, title, author, price, stock, category)", "Category (id, name)"]}')
+
+    STEP 4 - DESIGN BUSINESS FLOWS (MANDATORY):
+    For EACH major user journey/workflow, you MUST call the Solution Manager Tool:
+    Tool: Solution Manager Tool
+    Parameters:
+      - action: 'add_flow'
+      - component_data: JSON string with structure:
+        {
+          "name": "Flow Name (e.g., Purchase Flow, User Registration)",
+          "description": "What this flow accomplishes",
+          "steps": ["Step 1", "Step 2", ...],
+          "actors": ["User", "System", "Admin", ...]
+        }
+
+    Example:
+    Solution Manager Tool(action='add_flow', component_data='{"name": "Book Purchase Flow", "description": "Complete flow from browsing to order confirmation", "steps": ["User browses catalog on Home Page", "User clicks on book to view Product Detail Page", "User adds book to cart", "User proceeds to Cart Page", "User enters shipping info on Checkout Page", "User selects payment method", "System processes payment via Payment API", "System creates order via Order API", "System sends confirmation email", "User sees Order Confirmation Page"], "actors": ["Customer", "System", "Payment Gateway"]}')
+
+    IMPORTANT: You MUST create solution components for ALL aspects of the requirements.
+    Think comprehensively about what pages, APIs, and flows are needed.
+  expected_output: >
+    A summary message confirming solution design completion:
+    "Solution design completed. Created X frontend components, Y backend components, and Z business flows."
+
+    Note: Your tool calls to save solution components should happen automatically before this response.
+  agent: solution_designer
+
+solution_validation_task:
+  description: >
+    Validate the designed solution for completeness and coherence.
+
+    Use the Solution Manager Tool to:
+    1. Get current solution: action='get_solution'
+    2. Check completeness: action='check_complete'
+
+    Requirements to validate against:
+    {requirements_summary}
+
+    Current solution components:
+    {solution_summary}
+
+    Analyze:
+    - Does every requirement have corresponding solution components?
+    - Are all user-facing features covered by frontend components?
+    - Are all business logic needs covered by backend components?
+    - Are major user journeys documented as business flows?
+    - Are there any gaps or missing pieces?
+
+    If gaps found: Clearly identify what's missing and recommend additions.
+    If complete: Confirm solution is ready for documentation phase.
+  expected_output: >
+    A validation report in this format:
+
+    VALIDATION STATUS: [COMPLETE or INCOMPLETE]
+
+    COVERAGE ANALYSIS:
+    - Frontend: [Assessment of frontend component coverage]
+    - Backend: [Assessment of backend component coverage]
+    - Flows: [Assessment of business flow coverage]
+
+    GAPS IDENTIFIED: [List any missing components or flows, or "None" if complete]
+
+    RECOMMENDATION: [What should happen next]
+  agent: solution_validator
+
+solution_phase_evaluation_task:
+  description: >
+    Evaluate if the Solution phase is complete and ready to move to Documentation phase.
+
+    Use the Solution Manager Tool to:
+    1. Get solution summary: action='get_summary'
+    2. Check completeness: action='check_complete'
+
+    Current solution status:
+    {solution_summary}
+
+    Validation results:
+    {validation_results}
+
+    Decision criteria:
+    - At least 2 frontend components defined
+    - At least 2 backend components defined
+    - At least 1 business flow documented
+    - OR at least 6 total solution elements
+    - All major requirements have corresponding solution components
+
+    If ready: Recommend moving to Documentation phase.
+    If not ready: Identify what still needs to be designed.
+  expected_output: >
+    A clear decision in this format:
+
+    DECISION: [READY or NOT_READY]
+
+    REASONING: [2-3 sentences explaining why]
+
+    NEXT_STEPS: [What should happen next - either move to Documentation phase or what needs to be added to solution]
+  agent: phase_coordinator
+
+product_brief_creation_task:
+  description: >
+    Create a comprehensive Product Brief based on requirements and solution design.
+
+    Requirements:
+    {requirements_summary}
+
+    Solution Design:
+    {solution_summary}
+
+    Revision Feedback (if any):
+    {revision_feedback}
+
+    CRITICAL: You MUST follow these steps IN ORDER:
+
+    STEP 1 - ANALYZE INPUTS:
+    Review requirements and solution to understand the product completely.
+
+    STEP 2 - CREATE PRODUCT BRIEF (MANDATORY):
+    You MUST call the Documentation Manager Tool to save the Product Brief:
+    Tool: Documentation Manager Tool
+    Parameters:
+      - action: 'save_brief'
+      - data: JSON string with structure:
+        {
+          "product_summary": "Brief overview of the product (2-3 sentences)",
+          "problem_statement": "What problem does this solve? Why is it needed?",
+          "target_users": "Who will use this product? What are their needs?",
+          "product_goals": "What are the key objectives and success criteria?",
+          "scope": "What's included and what's NOT included in this product?",
+          "revision_count": 0
+        }
+
+    If revision_feedback is provided, focus on addressing the specific feedback while keeping other sections intact.
+
+    STEP 3 - CONFIRM COMPLETION:
+    After saving, confirm the Product Brief has been created.
+  expected_output: >
+    A confirmation message: "Product Brief created successfully with 5 sections: Product Summary, Problem Statement, Target Users, Product Goals, and Scope."
+  agent: product_brief_writer
+
+product_brief_review_task:
+  description: >
+    Review the Product Brief for quality, clarity, and alignment with requirements and solution.
+
+    Use the Documentation Manager Tool to get the current brief:
+    Tool: Documentation Manager Tool
+    Parameters:
+      - action: 'get_brief'
+
+    Requirements:
+    {requirements_summary}
+
+    Solution Design:
+    {solution_summary}
+
+    Evaluate:
+    - Is the Product Summary clear and concise?
+    - Does the Problem Statement accurately reflect the requirements?
+    - Are Target Users well-defined based on stakeholder requirements?
+    - Are Product Goals specific and measurable?
+    - Is the Scope clear about what's included and excluded?
+    - Does everything align with the requirements and solution?
+
+    Provide specific, actionable feedback for improvements.
+  expected_output: >
+    A review report in this format:
+
+    REVIEW STATUS: [APPROVED or NEEDS_REVISION]
+
+    STRENGTHS: [What's good about the brief]
+
+    IMPROVEMENT AREAS: [Specific sections that need work, if any]
+
+    RECOMMENDATIONS: [Concrete suggestions for improvement]
+  agent: brief_reviewer
+
+epic_story_creation_task:
+  description: >
+    Create Epics and User Stories based on the solution design, organized by feature domain.
+
+    Solution Design:
+    {solution_summary}
+
+    Revision Feedback (if any):
+    {revision_feedback}
+
+    CRITICAL: You MUST follow these steps IN ORDER:
+
+    STEP 1 - IDENTIFY FEATURE DOMAINS:
+    Based on solution components, identify major feature domains (e.g., Product Management, Cart, Order, Payment, User Management).
+
+    STEP 2 - CREATE EPICS (MANDATORY):
+    For EACH feature domain, you MUST call the Documentation Manager Tool:
+    Tool: Documentation Manager Tool
+    Parameters:
+      - action: 'add_epic'
+      - data: JSON string with structure:
+        {
+          "id": "epic-1",
+          "name": "Epic Name",
+          "description": "What this epic delivers",
+          "domain": "Feature Domain (Product/Cart/Order/Payment/etc)"
+        }
+
+    STEP 3 - CREATE USER STORIES (MANDATORY):
+    For EACH frontend component, backend API, and business flow, create User Stories:
+    Tool: Documentation Manager Tool
+    Parameters:
+      - action: 'add_story'
+      - data: JSON string with structure:
+        {
+          "epic_id": "epic-1",
+          "title": "As a [role], I want [feature] so that [benefit]",
+          "description": "Detailed description of the story",
+          "acceptance_criteria": [
+            "Given [context], when [action], then [outcome]",
+            "Another acceptance criterion"
+          ]
+        }
+
+    If revision_feedback is provided, focus on addressing specific gaps or changes requested.
+
+    IMPORTANT: Create comprehensive stories covering ALL solution components.
+  expected_output: >
+    A summary message: "Created X epics and Y user stories organized by feature domain."
+  agent: epic_story_writer
+
+backlog_validation_task:
+  description: >
+    Validate that Epics and Stories comprehensively cover the solution design.
+
+    Use the Documentation Manager Tool to get current documentation:
+    Tool: Documentation Manager Tool
+    Parameters:
+      - action: 'get_documentation'
+
+    Solution Design:
+    {solution_summary}
+
+    Analyze:
+    - Does every frontend component have corresponding user stories?
+    - Does every backend API have corresponding user stories?
+    - Does every business flow have corresponding user stories?
+    - Are epics properly organized by feature domain?
+    - Do all stories have clear acceptance criteria?
+    - Are there any gaps or missing stories?
+  expected_output: >
+    A validation report in this format:
+
+    VALIDATION STATUS: [COMPLETE or INCOMPLETE]
+
+    COVERAGE ANALYSIS:
+    - Epics: [Assessment of epic organization]
+    - Stories: [Assessment of story coverage]
+    - Acceptance Criteria: [Assessment of criteria quality]
+
+    GAPS IDENTIFIED: [List any missing stories or epics, or "None" if complete]
+
+    RECOMMENDATIONS: [What should be added or improved]
+  agent: backlog_validator
