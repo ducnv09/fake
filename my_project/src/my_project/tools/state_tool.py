@@ -1,26 +1,111 @@
 """
-Custom tool for agents to interact with conversation state
+Custom tool for agents to interact with Flow state
+Updated to work with CrewAI Flow instead of manual ConversationState
 """
 
 from crewai.tools import BaseTool
-from typing import Type, Optional
+from typing import Type, Optional, Any
 from pydantic import BaseModel, Field
-import sys
-from pathlib import Path
-
-# Add parent directory to path to import state_manager
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from state_manager import ConversationState
 
 
 class StateToolInput(BaseModel):
-    """Input schema for StateTool"""
-    action: str = Field(..., description="Action to perform: 'add_requirement', 'get_requirements', 'get_summary', 'check_complete'")
+    """Input schema for FlowStateTool"""
+    action: str = Field(..., description="Action to perform: 'add_requirement', 'add_requirements_batch', 'get_requirements', 'get_summary', 'check_complete'")
     category: Optional[str] = Field(None, description="Category: 'problem_goals', 'users_stakeholders', or 'features_scope'")
     content: Optional[str] = Field(None, description="Content to add (for add_requirement action)")
+    requirements: Optional[list] = Field(None, description="List of {category, content} dicts for batch add")
 
+
+class FlowStateTool(BaseTool):
+    name: str = "State Manager Tool"
+    description: str = """
+    Tool to interact with Flow state. Use this to:
+    - Add single requirement: action='add_requirement', category='problem_goals|users_stakeholders|features_scope', content='requirement text'
+    - Add multiple requirements at once (RECOMMENDED): action='add_requirements_batch', requirements=[{'category': 'problem_goals', 'content': 'req1'}, {'category': 'users_stakeholders', 'content': 'req2'}, ...]
+    - Get requirements: action='get_requirements', category='problem_goals|users_stakeholders|features_scope' (or omit category for all)
+    - Get summary: action='get_summary'
+    - Check if analysis complete: action='check_complete'
+    """
+    args_schema: Type[BaseModel] = StateToolInput
+    flow: Any = Field(default=None, exclude=True)
+
+    def __init__(self, flow: Any, **kwargs):
+        super().__init__(**kwargs)
+        object.__setattr__(self, 'flow', flow)
+
+    def _run(self, action: str, category: Optional[str] = None, content: Optional[str] = None, requirements: Optional[list] = None) -> str:
+        """Execute the tool action"""
+
+        if action == "add_requirement":
+            if not category or not content:
+                return "Error: 'add_requirement' requires both 'category' and 'content'"
+
+            print(f"\n[TOOL DEBUG] Before add: {self.flow.state.requirements}")
+            success = self.flow.state.add_requirement(category, content)
+            print(f"[TOOL DEBUG] After add: {self.flow.state.requirements}")
+            print(f"[TOOL DEBUG] Success: {success}")
+
+            if success:
+                return f"Successfully added requirement to {category}: {content}"
+            else:
+                return f"Failed to add requirement. Invalid category: {category}"
+
+        elif action == "add_requirements_batch":
+            if not requirements or not isinstance(requirements, list):
+                return "Error: 'add_requirements_batch' requires 'requirements' as a list of {category, content} dicts"
+
+            print(f"\n[TOOL DEBUG BATCH] Before batch add: {self.flow.state.requirements}")
+            added_count = 0
+            failed = []
+
+            for req in requirements:
+                if not isinstance(req, dict) or 'category' not in req or 'content' not in req:
+                    failed.append(f"Invalid requirement format: {req}")
+                    continue
+
+                success = self.flow.state.add_requirement(req['category'], req['content'])
+                if success:
+                    added_count += 1
+                else:
+                    failed.append(f"Failed to add: {req}")
+
+            print(f"[TOOL DEBUG BATCH] After batch add: {self.flow.state.requirements}")
+            print(f"[TOOL DEBUG BATCH] Added: {added_count}, Failed: {len(failed)}")
+
+            result = f"Batch add completed: {added_count} requirements added successfully"
+            if failed:
+                result += f"\n{len(failed)} failed:\n" + "\n".join(failed)
+            return result
+
+        elif action == "get_requirements":
+            if category:
+                reqs = self.flow.state.requirements.get(category, [])
+                if not reqs:
+                    return f"No requirements found in category: {category}"
+                return f"Requirements in {category}:\n" + "\n".join(f"- {r}" for r in reqs)
+            else:
+                # Return all requirements
+                return self.flow.state.get_all_requirements_text()
+
+        elif action == "get_summary":
+            return self.flow._get_conversation_summary()
+
+        elif action == "check_complete":
+            is_complete, reason = self.flow.state.is_analysis_complete()
+            status = "COMPLETE" if is_complete else "INCOMPLETE"
+            return f"Analysis Status: {status}\nReason: {reason}"
+
+        else:
+            return f"Error: Unknown action '{action}'. Valid actions: add_requirement, get_requirements, get_summary, check_complete"
+
+
+# ==================== LEGACY: For backward compatibility with old crew.py ====================
 
 class StateTool(BaseTool):
+    """
+    Legacy StateTool for backward compatibility with old crew.py
+    Works with ConversationState (manual JSON state)
+    """
     name: str = "State Manager Tool"
     description: str = """
     Tool to interact with conversation state. Use this to:
@@ -30,9 +115,9 @@ class StateTool(BaseTool):
     - Check if analysis complete: action='check_complete'
     """
     args_schema: Type[BaseModel] = StateToolInput
-    state_manager: ConversationState = Field(default=None, exclude=True)
+    state_manager: Any = Field(default=None, exclude=True)
 
-    def __init__(self, state_manager: ConversationState, **kwargs):
+    def __init__(self, state_manager: Any, **kwargs):
         super().__init__(**kwargs)
         object.__setattr__(self, 'state_manager', state_manager)
 
