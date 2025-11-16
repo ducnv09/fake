@@ -10,6 +10,8 @@ from .tools.state_tool import FlowStateTool
 from .tools.solution_tool import FlowSolutionTool
 from .tools.documentation_tool import FlowDocumentationTool
 from .tools.user_interaction_tool import FlowUserInteractionTool
+from .models.solution_models import ScreensOutput, ServicesOutput, FlowsOutput
+from .models.documentation_models import ProductBriefData, BacklogOutput
 
 
 @CrewBase
@@ -91,15 +93,15 @@ class BAFlow():
     def solution_designer(self) -> Agent:
         return Agent(
             config=self.agents_config['solution_designer'],
-            verbose=False,
-            tools=[self.solution_tool, self.user_interaction_tool]
+            verbose=True,
+            tools=[]  # Removed solution_tool to enable Pydantic bulk output
         )
 
     @agent
     def solution_validator(self) -> Agent:
         return Agent(
             config=self.agents_config['solution_validator'],
-            verbose=False,
+            verbose=True,
             tools=[self.solution_tool]
         )
 
@@ -109,7 +111,7 @@ class BAFlow():
             self._cached_agents['product_brief_writer'] = Agent(
                 config=self.agents_config['product_brief_writer'],
                 verbose=True,
-                tools=[self.documentation_tool]
+                tools=[]  # No tools - outputs Pydantic model instead
             )
         return self._cached_agents['product_brief_writer']
 
@@ -119,7 +121,7 @@ class BAFlow():
             self._cached_agents['brief_reviewer'] = Agent(
                 config=self.agents_config['brief_reviewer'],
                 verbose=True,
-                tools=[self.documentation_tool]
+                tools=[self.documentation_tool]  # Still needs tool to read brief
             )
         return self._cached_agents['brief_reviewer']
 
@@ -129,7 +131,7 @@ class BAFlow():
             self._cached_agents['epic_story_writer'] = Agent(
                 config=self.agents_config['epic_story_writer'],
                 verbose=True,
-                tools=[self.documentation_tool]
+                tools=[]  # No tools - outputs Pydantic model instead
             )
         return self._cached_agents['epic_story_writer']
 
@@ -153,8 +155,25 @@ class BAFlow():
         return Task(config=self.tasks_config['phase_evaluation_task'])
 
     @task
-    def solution_design_task(self) -> Task:
-        return Task(config=self.tasks_config['solution_design_task'])
+    def solution_design_screens_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['solution_design_screens_task'],
+            output_pydantic=ScreensOutput
+        )
+
+    @task
+    def solution_design_services_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['solution_design_services_task'],
+            output_pydantic=ServicesOutput
+        )
+
+    @task
+    def solution_design_flows_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['solution_design_flows_task'],
+            output_pydantic=FlowsOutput
+        )
 
     @task
     def solution_validation_task(self) -> Task:
@@ -166,7 +185,10 @@ class BAFlow():
 
     @task
     def product_brief_creation_task(self) -> Task:
-        return Task(config=self.tasks_config['product_brief_creation_task'])
+        return Task(
+            config=self.tasks_config['product_brief_creation_task'],
+            output_pydantic=ProductBriefData
+        )
 
     @task
     def product_brief_review_task(self) -> Task:
@@ -174,7 +196,10 @@ class BAFlow():
 
     @task
     def epic_story_creation_task(self) -> Task:
-        return Task(config=self.tasks_config['epic_story_creation_task'])
+        return Task(
+            config=self.tasks_config['epic_story_creation_task'],
+            output_pydantic=BacklogOutput
+        )
 
     @task
     def backlog_validation_task(self) -> Task:
@@ -292,36 +317,121 @@ class BAFlow():
 
     def solution_phase(self):
         """
-        Phase 2: Solution Design
+        Phase 3: Solution Design
         Runs Designer and Validator to create solution architecture
-        Called directly from main.py after analysis is complete
+        NOW RUNS AFTER BRIEF - designs HOW to implement the Product Brief
+        Called directly from main.py after brief is approved
         """
         # Transition phase
-        self.state.transition_to_phase("solution", "Analysis complete, moving to solution design")
+        self.state.transition_to_phase("solution", "Product Brief approved, designing solution")
 
-        # Get requirements
+        # Get requirements and product brief
         requirements_summary = self.state.get_all_requirements_text()
+        product_brief = self.state.get_product_brief_text()
+
+        # ===== STEP 1: Design Screens =====
+        print("\n🖥️ Step 1/3: Designing screens/pages...")
         solution_summary = self.state.get_solution_text()
 
-        # Create solution crew
-        solution_crew = Crew(
-            agents=[self.solution_designer(), self.solution_validator(), self.phase_coordinator()],
-            tasks=[self.solution_design_task(), self.solution_validation_task(), self.solution_phase_evaluation_task()],
+        screens_crew = Crew(
+            agents=[self.solution_designer()],
+            tasks=[self.solution_design_screens_task()],
             process=Process.sequential,
             verbose=False
         )
 
-        # Run crew
-        result = solution_crew.kickoff(inputs={
+        screens_result = screens_crew.kickoff(inputs={
             'requirements_summary': requirements_summary,
+            'product_brief': product_brief,
+            'solution_summary': solution_summary
+        })
+
+        # Get Pydantic output directly from task result
+        screens_output_obj: ScreensOutput = screens_result.pydantic
+
+        # Add all screens from Pydantic model to state
+        for screen in screens_output_obj.screens:
+            self.state.solution["screens"].append(screen.model_dump())
+
+        print(f"✅ Screens designed: {len(screens_output_obj.screens)} screens added")
+        screens_output = str(screens_result.tasks_output[0].raw)
+
+        # ===== STEP 2: Design Services =====
+        print("\n⚙️ Step 2/3: Designing backend services...")
+        solution_summary = self.state.get_solution_text()
+
+        services_crew = Crew(
+            agents=[self.solution_designer()],
+            tasks=[self.solution_design_services_task()],
+            process=Process.sequential,
+            verbose=False
+        )
+
+        services_result = services_crew.kickoff(inputs={
+            'requirements_summary': requirements_summary,
+            'product_brief': product_brief,
+            'solution_summary': solution_summary
+        })
+
+        # Get Pydantic output directly from task result
+        services_output_obj: ServicesOutput = services_result.pydantic
+
+        # Add all services from Pydantic model to state
+        for service in services_output_obj.services:
+            self.state.solution["services"].append(service.model_dump())
+
+        print(f"✅ Services designed: {len(services_output_obj.services)} services added")
+        services_output = str(services_result.tasks_output[0].raw)
+
+        # ===== STEP 3: Design Flows =====
+        print("\n🔄 Step 3/3: Designing business flows...")
+        solution_summary = self.state.get_solution_text()
+
+        flows_crew = Crew(
+            agents=[self.solution_designer()],
+            tasks=[self.solution_design_flows_task()],
+            process=Process.sequential,
+            verbose=False
+        )
+
+        flows_result = flows_crew.kickoff(inputs={
+            'requirements_summary': requirements_summary,
+            'product_brief': product_brief,
+            'solution_summary': solution_summary
+        })
+
+        # Get Pydantic output directly from task result
+        flows_output_obj: FlowsOutput = flows_result.pydantic
+
+        # Add all flows from Pydantic model to state
+        for flow in flows_output_obj.business_flows:
+            self.state.solution["business_flows"].append(flow.model_dump())
+
+        print(f"✅ Flows designed: {len(flows_output_obj.business_flows)} flows added")
+        flows_output = str(flows_result.tasks_output[0].raw)
+
+        # ===== STEP 4: Validate Solution =====
+        print("\n🔍 Validating solution...")
+        solution_summary = self.state.get_solution_text()
+
+        validation_crew = Crew(
+            agents=[self.solution_validator(), self.phase_coordinator()],
+            tasks=[self.solution_validation_task(), self.solution_phase_evaluation_task()],
+            process=Process.sequential,
+            verbose=False
+        )
+
+        validation_result = validation_crew.kickoff(inputs={
+            'requirements_summary': requirements_summary,
+            'product_brief': product_brief,
             'solution_summary': solution_summary,
             'validation_results': ""
         })
 
-        # Extract results
-        design_summary = str(result.tasks_output[0].raw)
-        validation_report = str(result.tasks_output[1].raw)
-        phase_evaluation = str(result.tasks_output[2].raw)
+        # Combine all outputs
+        design_summary = f"{screens_output}\n\n{services_output}\n\n{flows_output}"
+        validation_report = str(validation_result.tasks_output[0].raw)
+        phase_evaluation = str(validation_result.tasks_output[1].raw)
 
         # Store phase_evaluation temporarily for routing
         self._last_phase_evaluation = phase_evaluation
@@ -346,11 +456,37 @@ class BAFlow():
             print("\n⚠️ Solution needs more work")
             return "solution_incomplete"
 
+    def brief_phase(self):
+        """
+        Phase 2: Product Brief creation
+        Runs Brief Writer and Reviewer to create Product Brief
+        Called from main.py AFTER analysis is complete, BEFORE solution design
+        Returns brief for user approval BEFORE designing solution
+        """
+        # Transition phase
+        self.state.transition_to_phase("brief", "Analysis complete, creating Product Brief")
+
+        # Create Product Brief
+        brief_result = self._run_product_brief_phase()
+
+        return brief_result
+
+    def documentation_phase_backlog(self):
+        """
+        Phase 3B: Epics & Stories creation
+        Runs Epic/Story Writer and Validator to create Product Backlog
+        Called from main.py AFTER brief is approved by user
+        """
+        # Create Epics & Stories
+        backlog_result = self._run_backlog_phase()
+
+        return backlog_result
+
     def documentation_phase(self):
         """
-        Phase 3: Documentation (Product Brief + Epics/Stories)
-        Runs Writers and Reviewers to create comprehensive documentation
-        Called directly from main.py after solution is complete
+        LEGACY: Phase 3 combined (Product Brief + Epics/Stories)
+        Keep for backward compatibility but not recommended
+        Prefer using documentation_phase_brief() then documentation_phase_backlog()
         """
         # Transition phase
         self.state.transition_to_phase("documentation", "Solution complete, moving to documentation")
@@ -369,11 +505,12 @@ class BAFlow():
     def _run_product_brief_phase(self, revision_feedback: str = "") -> dict:
         """
         Create Product Brief (internal method)
+        NOW RUNS BEFORE SOLUTION - only uses requirements, not solution
+        Uses Pydantic output instead of tool calls
         """
         print("\n📝 Creating Product Brief...")
 
         requirements_summary = self.state.get_all_requirements_text()
-        solution_summary = self.state.get_solution_text()
 
         # Create brief crew
         brief_crew = Crew(
@@ -386,12 +523,26 @@ class BAFlow():
         # Run crew
         result = brief_crew.kickoff(inputs={
             'requirements_summary': requirements_summary,
-            'solution_summary': solution_summary,
             'revision_feedback': revision_feedback if revision_feedback else "None"
         })
 
+        # Get Pydantic output from FIRST task (Product Brief Writer)
+        brief_task_output = result.tasks_output[0]
+        brief_data: ProductBriefData = brief_task_output.pydantic
+
+        # Check if Pydantic output exists
+        if brief_data is None:
+            print("⚠️ Warning: No Pydantic output from Product Brief Writer")
+            print("⚠️ Brief may have been saved by Reviewer instead")
+        else:
+            # Save to state using documentation tool
+            self.documentation_tool._run(
+                action='save_brief',
+                data=brief_data.model_dump_json()
+            )
+            print(f"✅ Product Brief created and saved")
+
         # Extract results
-        creation_summary = str(result.tasks_output[0].raw)
         review_report = str(result.tasks_output[1].raw)
         brief_text = self.state.get_product_brief_text()
 
@@ -406,10 +557,12 @@ class BAFlow():
     def _run_backlog_phase(self, revision_feedback: str = "") -> dict:
         """
         Create Epics & Stories (internal method)
+        Uses Pydantic output instead of tool calls
         """
         print("\n📋 Creating Epics & Stories...")
 
         solution_summary = self.state.get_solution_text()
+        product_brief = self.state.get_product_brief_text()
 
         # Create backlog crew
         backlog_crew = Crew(
@@ -422,11 +575,34 @@ class BAFlow():
         # Run crew
         result = backlog_crew.kickoff(inputs={
             'solution_summary': solution_summary,
+            'product_brief': product_brief,
             'revision_feedback': revision_feedback if revision_feedback else "None"
         })
 
+        # Get Pydantic output from FIRST task (Epic & Story Writer)
+        backlog_task_output = result.tasks_output[0]
+        backlog_data: BacklogOutput = backlog_task_output.pydantic
+
+        # Check if Pydantic output exists
+        if backlog_data is None:
+            print("⚠️ Warning: No Pydantic output from Epic & Story Writer")
+        else:
+            # Save epics and stories to state using documentation tool
+            for epic in backlog_data.epics:
+                self.documentation_tool._run(
+                    action='add_epic',
+                    data=epic.model_dump_json()
+                )
+
+            for story in backlog_data.stories:
+                self.documentation_tool._run(
+                    action='add_story',
+                    data=story.model_dump_json()
+                )
+
+            print(f"✅ Backlog created: {len(backlog_data.epics)} epics, {len(backlog_data.stories)} stories")
+
         # Extract results
-        creation_summary = str(result.tasks_output[0].raw)
         validation_report = str(result.tasks_output[1].raw)
         backlog_text = self.state.get_backlog_text()
 
@@ -463,7 +639,11 @@ class BAFlow():
             return requirements
 
         start_idx = ba_response.find("=== EXTRACTED REQUIREMENTS ===")
+
+        # Try both formats: with and without spaces
         end_idx = ba_response.find("=== END REQUIREMENTS ===")
+        if end_idx == -1:
+            end_idx = ba_response.find("===END REQUIREMENTS===")
 
         if start_idx == -1 or end_idx == -1:
             return requirements
@@ -509,9 +689,14 @@ class BAFlow():
         # Find the response section
         if "=== USER RESPONSE ===" not in ba_response:
             # Fallback: return everything after requirements section
-            if "=== END REQUIREMENTS ===" in ba_response:
-                end_idx = ba_response.find("=== END REQUIREMENTS ===")
-                return ba_response[end_idx + len("=== END REQUIREMENTS ==="):].strip()
+            # Try both formats: with and without spaces
+            end_idx = ba_response.find("=== END REQUIREMENTS ===")
+            if end_idx == -1:
+                end_idx = ba_response.find("===END REQUIREMENTS===")
+
+            if end_idx != -1:
+                marker_len = len("=== END REQUIREMENTS ===") if "=== END REQUIREMENTS ===" in ba_response else len("===END REQUIREMENTS===")
+                return ba_response[end_idx + marker_len:].strip()
             return ba_response.strip()
 
         start_idx = ba_response.find("=== USER RESPONSE ===")

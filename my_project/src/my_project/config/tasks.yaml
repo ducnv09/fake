@@ -112,117 +112,139 @@ phase_evaluation_task:
     NEXT_STEPS: [What should happen next - either move to Solution phase or what questions still need answers]
   agent: phase_coordinator
 
-solution_design_task:
+# ==================== SOLUTION DESIGN PHASE - BROKEN INTO 3 SEQUENTIAL TASKS ====================
+
+solution_design_screens_task:
   description: >
-    Design a comprehensive BUSINESS solution based on the collected requirements.
+    TASK 1/3: Design all user-facing SCREENS/PAGES for the solution.
 
     CRITICAL: You are a BUSINESS ANALYST, NOT a technical architect.
     Focus on WHAT the solution does for users, NOT HOW it's technically implemented.
 
+    Product Brief (defines WHAT to build):
+    {product_brief}
+
     Requirements to analyze:
     {requirements_summary}
 
-    CRITICAL: You MUST follow these steps IN ORDER:
+    YOUR JOB: Analyze the Product Brief and identify ALL screens needed.
 
-    STEP 1 - ANALYZE REQUIREMENTS:
-    Review all requirements and understand:
-    - What problem needs to be solved
-    - Who will use the system and what they need
-    - What features and capabilities are needed
+    STEP 1 - ANALYZE AND PLAN:
+    Review the Product Brief and Requirements to identify ALL screens needed:
+    - What screens do CUSTOMERS need? (e.g., browse products, view details, checkout, track orders)
+    - What screens do ADMINS need? (e.g., manage inventory, view reports, manage orders)
+    - What screens do EMPLOYEES need? (e.g., add products, update stock)
 
-    STEP 2 - DESIGN SCREENS/PAGES (MANDATORY):
-    For EACH user-facing screen needed, you MUST call the Solution Manager Tool:
-    Tool: Solution Manager Tool
-    Parameters:
-      - action: 'add_screen'
-      - component_data: JSON string with structure:
-        {
-          "name": "Screen Name (e.g., Home Page, Product Detail Page, Admin Dashboard)",
-          "purpose": "What this screen does from business perspective",
-          "user_can": ["Action 1", "Action 2", ...],
-          "navigation": {
-            "from": ["Screen A", "Screen B"],
-            "to": ["Screen C", "Screen D"]
-          }
-        }
+    STEP 2 - DESIGN SCREENS:
+    For each screen, define:
+    - name: Screen name (e.g., "Home Page", "Admin Dashboard")
+    - purpose: What this screen does from business perspective
+    - user_can: Array of actions users can perform
+    - navigation: Object with "from" and "to" arrays showing navigation paths
 
-    Example for e-commerce book website:
-    1. Solution Manager Tool(action='add_screen', component_data='{"name": "Home Page", "purpose": "Landing page for customers to discover books", "user_can": ["Browse book catalog", "Search by title/author", "Filter by category", "Click on book to view details"], "navigation": {"from": ["Direct entry", "Header navigation"], "to": ["Product Detail Page", "Search Results", "Cart Page"]}}')
-
-    2. Solution Manager Tool(action='add_screen', component_data='{"name": "Product Detail Page", "purpose": "Detailed view of a single book with purchase option", "user_can": ["View book information (title, author, price, description)", "See customer reviews", "Add book to cart", "View related books"], "navigation": {"from": ["Home Page", "Search Results"], "to": ["Cart Page", "Home Page"]}}')
-
-    IMPORTANT: DO NOT include technical details like:
-    - Component frameworks (React, Vue, etc.)
-    - State management (Redux, Context API)
-    - UI libraries or CSS frameworks
-    Focus on USER PERSPECTIVE: What can users DO on this screen?
-
-    STEP 3 - DESIGN BACKEND SERVICES (MANDATORY):
-    For EACH backend business service needed, you MUST call the Solution Manager Tool:
-    Tool: Solution Manager Tool
-    Parameters:
-      - action: 'add_service'
-      - component_data: JSON string with structure:
-        {
-          "name": "Service Name (e.g., Product Management Service, Order Processing Service)",
-          "purpose": "What this service does from business perspective",
-          "responsibilities": ["Responsibility 1", "Responsibility 2", ...],
-          "supports_screens": ["Screen 1", "Screen 2", ...]
-        }
-
-    Example:
-    Solution Manager Tool(action='add_service', component_data='{"name": "Product Management Service", "purpose": "Manages book catalog and inventory for the platform", "responsibilities": ["Maintain product information (books)", "Track inventory levels", "Handle product search and filtering", "Provide product recommendations"], "supports_screens": ["Home Page", "Product Detail Page", "Search Results", "Admin Dashboard"]}')
-
-    IMPORTANT: DO NOT include technical details like:
-    - API endpoints (GET /api/products, POST /orders)
-    - Database schemas (Product table, foreign keys)
-    - Technology choices (REST, GraphQL, SQL, NoSQL)
-    Focus on BUSINESS RESPONSIBILITIES: What business functions does this service handle?
-
-    STEP 4 - DESIGN BUSINESS FLOWS (MANDATORY):
-    For EACH major user journey/workflow, you MUST call the Solution Manager Tool:
-    Tool: Solution Manager Tool
-    Parameters:
-      - action: 'add_flow'
-      - component_data: JSON string with structure:
-        {
-          "name": "Flow Name (e.g., Purchase Flow, User Registration Flow)",
-          "description": "What this flow accomplishes",
-          "steps": ["Step 1", "Step 2", ...],
-          "actors": ["Actor 1", "Actor 2", ...]
-        }
-
-    Example:
-    Solution Manager Tool(action='add_flow', component_data='{"name": "Book Purchase Flow", "description": "Complete customer journey from browsing to order confirmation", "steps": ["Customer lands on Home Page", "Customer searches or browses books", "Customer clicks on a book to view Product Detail Page", "Customer adds book to cart", "Customer proceeds to Cart Page", "Customer reviews cart items", "Customer proceeds to Checkout Page", "Customer enters shipping information", "Customer selects payment method", "Customer confirms order", "System processes payment", "System creates order record", "System sends confirmation email", "Customer sees Order Confirmation Page"], "actors": ["Customer", "System", "Payment Gateway", "Email Service"]}')
-
-    IMPORTANT: You MUST create solution components for ALL aspects of the requirements.
-    Think comprehensively about what screens, services, and flows are needed.
-
-    Minimum requirements:
-    - At least 3-5 screens/pages
-    - At least 2-3 backend services
-    - At least 2-3 business flows
-
-    STEP 5 - FINALIZE:
-    After creating all necessary components, provide a final summary response (do NOT make more tool calls).
+    CRITICAL RULES:
+    - Design ALL screens at once
+    - DO NOT include technical details (React, Vue, Redux, etc.)
+    - Focus on USER PERSPECTIVE: What can users DO on this screen?
+    - Your output will be automatically parsed as ScreensOutput Pydantic model
   expected_output: >
-    A summary message confirming solution design completion in this EXACT format:
+    A complete list of all screens in the solution. Each screen must have:
+    - name: Screen name
+    - purpose: Business purpose
+    - user_can: List of user actions
+    - navigation: Navigation paths (from/to)
+  agent: solution_designer
 
-    "Solution design completed.
+solution_design_services_task:
+  description: >
+    TASK 2/3: Design all BACKEND SERVICES for the solution.
 
-    Created components:
-    - X screens/pages
-    - Y backend services
-    - Z business flows
+    CRITICAL: You are a BUSINESS ANALYST, NOT a technical architect.
 
-    Total: [X+Y+Z] solution elements"
+    Product Brief (defines WHAT to build):
+    {product_brief}
 
-    CRITICAL: After providing this summary, your task is COMPLETE. Do NOT make additional tool calls.
+    Requirements to analyze:
+    {requirements_summary}
+
+    Screens already designed:
+    {solution_summary}
+
+    YOUR JOB: Analyze the Product Brief and screens, identify ALL backend services needed.
+
+    STEP 1 - ANALYZE AND PLAN:
+    Review the Product Brief, Requirements, and Screens to identify ALL backend services needed:
+    - What business functions need to be handled? (e.g., manage products, process orders, handle payments)
+    - What data needs to be managed? (e.g., user data, inventory, orders)
+    - What services support the screens you designed?
+
+    STEP 2 - DESIGN SERVICES:
+    For each service, define:
+    - name: Service name (e.g., "Product Management Service")
+    - purpose: What this service does from business perspective
+    - responsibilities: Array of business responsibilities
+    - supports_screens: Array of screen names this service supports
+
+    CRITICAL RULES:
+    - Design ALL services at once
+    - DO NOT include technical details (API endpoints, database schemas, REST/GraphQL, SQL/NoSQL)
+    - Focus on BUSINESS RESPONSIBILITIES: What business functions does this service handle?
+    - Your output will be automatically parsed as ServicesOutput Pydantic model
+  expected_output: >
+    A complete list of all backend services in the solution. Each service must have:
+    - name: Service name
+    - purpose: Business purpose
+    - responsibilities: List of business responsibilities
+    - supports_screens: List of screen names
+  agent: solution_designer
+
+solution_design_flows_task:
+  description: >
+    TASK 3/3: Design all BUSINESS FLOWS (user journeys) for the solution.
+
+    CRITICAL: You are a BUSINESS ANALYST, NOT a technical architect.
+
+    Product Brief (defines WHAT to build):
+    {product_brief}
+
+    Requirements to analyze:
+    {requirements_summary}
+
+    Solution components already designed:
+    {solution_summary}
+
+    YOUR JOB: Analyze the Product Brief and identify ALL major user journeys/workflows.
+
+    STEP 1 - ANALYZE AND PLAN:
+    Review the Product Brief and solution components to identify ALL major flows needed:
+    - What are the main user journeys? (e.g., customer purchasing a book, admin managing inventory)
+    - What are the key workflows that achieve product goals?
+    - What processes involve multiple screens and services?
+
+    STEP 2 - DESIGN FLOWS:
+    For each flow, define:
+    - name: Flow name (e.g., "Book Purchase Flow")
+    - description: What this flow accomplishes
+    - steps: Array of detailed steps from start to finish
+    - actors: Array of actors involved (users, systems, external services)
+
+    CRITICAL RULES:
+    - Design ALL flows at once
+    - Focus on complete end-to-end user journeys
+    - Include all steps from start to finish
+    - Identify all actors (users, systems, external services)
+    - Your output will be automatically parsed as FlowsOutput Pydantic model
+  expected_output: >
+    A complete list of all business flows in the solution. Each flow must have:
+    - name: Flow name
+    - description: What this flow accomplishes
+    - steps: List of detailed steps
+    - actors: List of actors involved
   agent: solution_designer
 
 solution_validation_task:
   description: >
-    Validate the designed solution for completeness and coherence.
+    Validate the designed solution for completeness and coherence against the Product Brief.
 
     STEP 1 - GET SOLUTION:
     Use the Solution Manager Tool to get current solution:
@@ -236,6 +258,9 @@ solution_validation_task:
     Parameters:
       - action: 'check_complete'
 
+    Product Brief (what we're building):
+    {product_brief}
+
     Requirements to validate against:
     {requirements_summary}
 
@@ -243,7 +268,10 @@ solution_validation_task:
     {solution_summary}
 
     STEP 3 - ANALYZE:
+    - Does the solution support all Product Goals defined in the Brief?
     - Does every requirement have corresponding solution components?
+    - Are all Target Users from the Brief considered in the solution?
+    - Does the solution stay within the defined Scope from the Brief?
     - Are all user-facing features covered by screens/pages?
     - Are all business logic needs covered by backend services?
     - Are major user journeys documented as business flows?
@@ -253,7 +281,7 @@ solution_validation_task:
     Based on your analysis, provide the final validation report (do NOT make more tool calls after this).
 
     If gaps found: Clearly identify what's missing and recommend additions.
-    If complete: Confirm solution is ready for documentation phase.
+    If complete: Confirm solution is ready for backlog creation.
   expected_output: >
     A validation report in this EXACT format:
 
@@ -306,75 +334,56 @@ solution_phase_evaluation_task:
 
 product_brief_creation_task:
   description: >
-    Create a comprehensive Product Brief based on requirements and solution design.
+    Create a comprehensive Product Brief based on requirements analysis.
+    This brief defines WHAT needs to be built, and will guide the Solution Design phase (HOW to build it).
 
     Requirements:
     {requirements_summary}
 
-    Solution Design:
-    {solution_summary}
-
     Revision Feedback (if any):
     {revision_feedback}
 
-    CRITICAL: You MUST follow these steps IN ORDER:
+    YOUR JOB: Analyze requirements and create a Product Brief with all required sections.
 
-    STEP 1 - ANALYZE INPUTS:
-    Review requirements and solution to understand the product completely.
-    Extract key information needed for each Product Brief section.
+    STEP 1 - ANALYZE REQUIREMENTS:
+    Review the requirements gathered during the analysis phase.
+    Extract key information needed for each Product Brief section:
+    - What problem are we solving? (from problem_goals)
+    - Who are the users and what do they need? (from users_stakeholders)
+    - What features should be included? (from features_scope)
+    - What are the success criteria and objectives?
 
-    STEP 2 - CREATE PRODUCT BRIEF (MANDATORY):
-    You MUST call the Documentation Manager Tool to save the Product Brief:
-    Tool: Documentation Manager Tool
-    Parameters:
-      - action: 'save_brief'
-      - data: JSON string with structure:
-        {
-          "product_summary": "Brief overview of the product (2-3 sentences)",
-          "problem_statement": "What problem does this solve? Why is it needed?",
-          "target_users": "Who will use this product? What are their needs?",
-          "product_goals": "What are the key objectives and success criteria?",
-          "scope": "What's included and what's NOT included in this product?",
-          "revision_count": 0
-        }
+    STEP 2 - CREATE PRODUCT BRIEF:
+    Design the Product Brief with these sections:
+    - product_summary: Brief overview (2-3 sentences). Use clear, concise language.
+    - problem_statement: What problem does this solve? Why is it needed? Write in short paragraphs (max 3-4 sentences each) separated by newlines.
+    - target_users: Who will use this product? Format as numbered list, one user group per line.
+    - product_goals: Key objectives and success criteria. Format as numbered list with clear goals.
+    - scope: What's IN SCOPE and what's OUT OF SCOPE. Separate sections clearly.
+    - revision_count: Set to 0 (or increment if revision_feedback provided)
 
-    IMPORTANT: ALL fields are REQUIRED and must be filled with meaningful content based on requirements.
-    Do NOT leave any field empty or with placeholder text.
+    FORMATTING REQUIREMENTS:
+    - Use \n for line breaks within each field to improve readability
+    - Use numbered lists (1., 2., 3.) or bullet points (-, •) where appropriate
+    - Keep paragraphs short (max 3-4 sentences before a line break)
+    - Separate major sections within a field with double line breaks (\n\n)
+    - Target Users: Format as numbered list, one user group per line
+    - Product Goals: Format as numbered list with clear, measurable goals
+    - Scope: Clearly separate IN SCOPE and OUT OF SCOPE sections
 
     If revision_feedback is provided, focus on addressing the specific feedback while keeping other sections intact.
 
-    STEP 3 - VALIDATE COMPLETENESS (MANDATORY):
-    After saving, you MUST validate the Product Brief:
-    Tool: Documentation Manager Tool
-    Parameters:
-      - action: 'validate_brief'
-
-    This will check if any required fields are missing.
-
-    STEP 4 - CONFIRM COMPLETION:
-    After validation, provide a final confirmation message (do NOT make more tool calls).
+    IMPORTANT: ALL fields are REQUIRED and must be filled with meaningful content based on requirements.
+    Do NOT leave any field empty or with placeholder text.
   expected_output: >
-    A confirmation message in this EXACT format:
-
-    "Product Brief created successfully.
-
-    Sections completed:
-    - Product Summary
-    - Problem Statement
-    - Target Users
-    - Product Goals
-    - Scope
-
-    Validation: [Result from validate_brief tool]
-
-    The brief is ready for review."
-
-    CRITICAL: After providing this confirmation, your task is COMPLETE. Do NOT make additional tool calls.
+    A complete Product Brief with all required sections filled with meaningful content from the requirements.
+    The output will be automatically parsed as ProductBriefData Pydantic model.
   agent: product_brief_writer
 
 product_brief_review_task:
   description: >
-    Review the Product Brief for quality, clarity, and alignment with requirements and solution.
+    Review the Product Brief for quality, clarity, and alignment with requirements.
+    This brief will guide the Solution Design phase, so it must be complete and clear.
 
     STEP 1 - GET BRIEF:
     Use the Documentation Manager Tool to get the current brief:
@@ -384,9 +393,6 @@ product_brief_review_task:
 
     Requirements:
     {requirements_summary}
-
-    Solution Design:
-    {solution_summary}
 
     STEP 2 - EVALUATE:
     - Is the Product Summary clear and concise?
@@ -415,7 +421,10 @@ product_brief_review_task:
 
 epic_story_creation_task:
   description: >
-    Create Epics and User Stories based on the solution design, organized by feature domain.
+    Create Epics and User Stories based on the Product Brief and Solution Design, organized by feature domain.
+
+    Product Brief:
+    {product_brief}
 
     Solution Design:
     {solution_summary}
@@ -423,65 +432,53 @@ epic_story_creation_task:
     Revision Feedback (if any):
     {revision_feedback}
 
-    CRITICAL: You MUST follow these steps IN ORDER:
+    YOUR JOB: Design comprehensive Epics and User Stories that cover all solution components.
 
-    STEP 1 - IDENTIFY FEATURE DOMAINS:
-    Based on solution components, identify 3-5 major feature domains (e.g., Product Management, Cart, Order, Payment, User Management).
+    STEP 1 - UNDERSTAND PRODUCT CONTEXT:
+    Review the Product Brief to understand:
+    - Problem Statement: What problem are we solving?
+    - Target Users: Who will use this system and what are their needs?
+    - Product Goals: What are the success criteria?
+    - Scope: What's in-scope vs out-of-scope?
 
-    STEP 2 - CREATE EPICS (MANDATORY):
-    For EACH feature domain, you MUST call the Documentation Manager Tool:
-    Tool: Documentation Manager Tool
-    Parameters:
-      - action: 'add_epic'
-      - data: JSON string with structure:
-        {
-          "id": "epic-1",
-          "name": "Epic Name",
-          "description": "What this epic delivers",
-          "domain": "Feature Domain (Product/Cart/Order/Payment/etc)"
-        }
+    STEP 2 - IDENTIFY FEATURE DOMAINS:
+    Based on solution components and product goals, identify 3-5 major feature domains (e.g., Product Management, Cart, Order, Payment, User Management).
 
-    STEP 3 - CREATE USER STORIES (MANDATORY):
-    For EACH frontend component, backend API, and business flow, create 2-3 User Stories:
-    Tool: Documentation Manager Tool
-    Parameters:
-      - action: 'add_story'
-      - data: JSON string with structure:
-        {
-          "epic_id": "epic-1",
-          "title": "As a [role], I want [feature] so that [benefit]",
-          "description": "Detailed description of the story",
-          "acceptance_criteria": [
-            "Given [context], when [action], then [outcome]",
-            "Another acceptance criterion"
-          ]
-        }
+    STEP 3 - DESIGN EPICS:
+    For EACH feature domain, create an Epic with:
+    - id: Epic ID (e.g., "epic-1", "epic-2")
+    - name: Epic name
+    - description: What this epic delivers
+    - domain: Feature domain name
+
+    STEP 4 - DESIGN USER STORIES:
+    For EACH frontend component, backend API, and business flow, create 2-3 User Stories.
+    IMPORTANT: Consider Target Users from Product Brief when writing stories (use correct roles like "customer", "admin", "warehouse manager").
+
+    Each story must have:
+    - epic_id: ID of the epic this story belongs to
+    - title: In format "As a [role from Target Users], I want [feature] so that [benefit aligned with Product Goals]"
+    - description: Detailed description of the story
+    - acceptance_criteria: List of criteria in Given-When-Then format
 
     Target: Create at least 10-15 user stories total covering all solution components.
+    Ensure stories align with Product Goals and stay within defined Scope.
 
     If revision_feedback is provided, focus on addressing specific gaps or changes requested.
 
-    STEP 4 - FINALIZE:
-    After creating all epics and stories, provide a final summary response (do NOT make more tool calls).
-
-    IMPORTANT: Create comprehensive stories covering ALL solution components.
+    IMPORTANT: Create comprehensive epics and stories covering ALL solution components.
   expected_output: >
-    A summary message in this EXACT format:
+    A complete backlog with both epics and stories.
+    Output format:
+    - epics: List of all epics organized by feature domain
+    - stories: List of all user stories with acceptance criteria
 
-    "Backlog creation completed.
-
-    Created:
-    - X epics organized by feature domain
-    - Y user stories with acceptance criteria
-
-    Feature domains covered: [list domain names]"
-
-    CRITICAL: After providing this summary, your task is COMPLETE. Do NOT make additional tool calls.
+    The output will be automatically parsed as BacklogOutput Pydantic model.
   agent: epic_story_writer
 
 backlog_validation_task:
   description: >
-    Validate that Epics and Stories comprehensively cover the solution design.
+    Validate that Epics and Stories comprehensively cover the Product Brief scope and solution design.
 
     STEP 1 - GET DOCUMENTATION:
     Use the Documentation Manager Tool to get current documentation:
@@ -489,14 +486,19 @@ backlog_validation_task:
     Parameters:
       - action: 'get_documentation'
 
+    Product Brief:
+    {product_brief}
+
     Solution Design:
     {solution_summary}
 
-    STEP 2 - ANALYZE:
-    - Does every frontend component have corresponding user stories?
-    - Does every backend API have corresponding user stories?
-    - Does every business flow have corresponding user stories?
+    STEP 2 - ANALYZE COVERAGE:
+    - Does every solution component (frontend/backend/flow) have corresponding user stories?
     - Are epics properly organized by feature domain?
+    - Do all stories align with Target Users defined in Product Brief?
+    - Do stories support Product Goals?
+    - Are all in-scope features from Product Brief covered?
+    - Are there any out-of-scope features included by mistake?
     - Do all stories have clear acceptance criteria?
     - Are there any gaps or missing stories?
 

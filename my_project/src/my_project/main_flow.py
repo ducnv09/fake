@@ -126,10 +126,11 @@ def run():
     print("I'll help you gather requirements for your software project.", flush=True)
     print("\nPhase: ANALYSIS", flush=True)
     print("Focus: Understanding your problem, users, and desired features", flush=True)
+    print("\nFlow: Analysis → Product Brief → Solution Design → Product Backlog", flush=True)
     print("\nCommands:", flush=True)
     print("  'status'   - See collected requirements", flush=True)
     print("  'progress' - See overall progress", flush=True)
-    print("  'done'     - Move to solution design", flush=True)
+    print("  'done'     - Move to Product Brief creation", flush=True)
     print("  'quit'     - End session", flush=True)
     print("=" * 70, flush=True)
     print(flush=True)
@@ -177,149 +178,153 @@ def run():
 
             # Check if user wants to proceed to solution phase
             if user_input.lower() == 'done':
-                # Check if we have enough requirements
-                is_complete, reason = flow.state.is_analysis_complete()
-                total_reqs = sum(len(v) for v in flow.state.requirements.values())
-
-                if not is_complete and total_reqs < 5:
-                    print(f"\n⚠️ Chưa đủ thông tin: {reason}")
-                    print("Vui lòng cung cấp thêm thông tin hoặc gõ 'done' lần nữa để tiếp tục.")
-                    continue
-
                 print("\n" + "=" * 70)
-                print("✅ Chuyển sang phase SOLUTION DESIGN...")
+                print("✅ Analysis complete, moving to PRODUCT BRIEF creation...")
                 print("=" * 70)
 
-                # Run the full Flow (solution + documentation)
                 try:
                     # Add a final marker message
                     flow.state.add_message("user", "[Analysis phase completed by user]")
 
-                    # Manually trigger solution phase
-                    print("\n🎨 Solution Designer is working...")
+                    # ===== PHASE 2: Create Product Brief =====
+                    print("\n📝 Phase 2: Creating Product Brief...")
                     print("This may take a few moments...")
                     print("-" * 70)
 
-                    result = flow.solution_phase()
+                    brief_result = flow.brief_phase()
 
-                    # Check if there's a pending user question from solution phase
-                    if flow.state.pending_user_question:
-                        pending_q = flow.state.pending_user_question
-                        options = display_pending_question(pending_q)
-
-                        selected = get_user_choice_input(options)
-
-                        if selected:
-                            flow.state.add_user_choice(
-                                context=pending_q['context'],
-                                question=pending_q['question'],
-                                selected_label=selected['label'],
-                                selected_value=selected['value']
-                            )
-                            print(f"\n✅ Choice recorded: {selected['label']}")
-
-                            # Re-run solution phase with user choice
-                            print("\n🎨 Applying your choice...")
-                            result = flow.solution_phase()
-
-                    # Display solution results
-                    print("\n" + "=" * 70)
-                    print("✅ SOLUTION PHASE COMPLETE!")
-                    print("=" * 70)
-
-                    print("\n📐 Solution Design Summary:")
-                    print(result['design_summary'])
-
-                    print("\n✔️ Validation Report:")
-                    print(result['validation_report'])
-
-                    print("\n📊 Phase Evaluation:")
-                    print(result['phase_evaluation'])
+                    # Display and approve Product Brief
+                    brief_text = brief_result['brief_text']
 
                     print("\n" + "=" * 70)
-                    print("📋 COMPLETE SOLUTION:")
+                    print("📊 BRIEF REVIEW")
                     print("=" * 70)
-                    solution_preview = flow.state.get_solution_text()
-                    print(solution_preview)
+                    print(brief_result['review_report'])
 
-                    # Request user approval for solution
-                    approval_status, feedback = request_approval(
-                        "SOLUTION DESIGN",
-                        solution_preview,
-                        "solution_approved"
+                    brief_approval_status, brief_feedback = request_approval(
+                        "PRODUCT BRIEF",
+                        brief_text,
+                        "brief_approved"
                     )
 
-                    if approval_status == 'approved':
-                        flow.state.record_approval("solution_approved", True, "")
-                        print("\n✅ Solution approved!")
-                    elif approval_status == 'refine':
-                        flow.state.record_approval("solution_approved", False, feedback)
-                        print(f"\n📝 Refinement requested: {feedback}")
-                        print("⚠️ Note: Automatic refinement not yet implemented. Continuing with current solution.")
+                    if brief_approval_status == 'approved':
+                        flow.state.record_approval("brief_approved", True, "")
+                        print("\n✅ Product Brief approved!")
+                    elif brief_approval_status == 'refine':
+                        flow.state.record_approval("brief_approved", False, brief_feedback)
+                        print(f"\n📝 Refinement requested: {brief_feedback}")
+                        print("⚠️ Note: Automatic refinement not yet implemented.")
                     else:
-                        flow.state.record_approval("solution_approved", False, "User rejected")
-                        print("\n⚠️ Solution rejected. Continuing anyway.")
+                        flow.state.record_approval("brief_approved", False, "User rejected")
+                        print("\n⚠️ Product Brief rejected.")
 
-                    # Check if ready for documentation
-                    should_continue = flow.check_solution_complete()
-
-                    if should_continue == "solution_complete":
+                    # Only proceed to Solution if Brief approved
+                    if brief_approval_status == 'approved':
+                        # ===== PHASE 3: Design Solution =====
                         print("\n" + "=" * 70)
-                        print("🚀 Moving to DOCUMENTATION phase...")
+                        print("🚀 Moving to SOLUTION DESIGN phase...")
                         print("=" * 70)
 
-                        # Run documentation phase
-                        doc_result = flow.documentation_phase()
+                        print("\n🎨 Solution Designer is working...")
+                        print("This may take a few moments...")
+                        print("-" * 70)
 
-                        # Display and approve Product Brief
-                        brief_text = doc_result['product_brief']['brief_text']
+                        result = flow.solution_phase()
 
-                        approval_status, feedback = request_approval(
-                            "PRODUCT BRIEF",
-                            brief_text,
-                            "brief_approved"
+                        # Check if there's a pending user question from solution phase
+                        if flow.state.pending_user_question:
+                            pending_q = flow.state.pending_user_question
+                            options = display_pending_question(pending_q)
+
+                            selected = get_user_choice_input(options)
+
+                            if selected:
+                                flow.state.add_user_choice(
+                                    context=pending_q['context'],
+                                    question=pending_q['question'],
+                                    selected_label=selected['label'],
+                                    selected_value=selected['value']
+                                )
+                                print(f"\n✅ Choice recorded: {selected['label']}")
+
+                                # Re-run solution phase with user choice
+                                print("\n🎨 Applying your choice...")
+                                result = flow.solution_phase()
+
+                        # Display solution results
+                        print("\n" + "=" * 70)
+                        print("✅ SOLUTION PHASE COMPLETE!")
+                        print("=" * 70)
+
+                        print("\n📐 Solution Design Summary:")
+                        print(result['design_summary'])
+
+                        print("\n✔️ Validation Report:")
+                        print(result['validation_report'])
+
+                        print("\n📊 Phase Evaluation:")
+                        print(result['phase_evaluation'])
+
+                        # Request user approval for solution
+                        solution_preview = flow.state.get_solution_text()
+                        solution_approval_status, solution_feedback = request_approval(
+                            "SOLUTION DESIGN",
+                            solution_preview,
+                            "solution_approved"
                         )
 
-                        if approval_status == 'approved':
-                            flow.state.record_approval("brief_approved", True, "")
-                            print("\n✅ Product Brief approved!")
-                        elif approval_status == 'refine':
-                            flow.state.record_approval("brief_approved", False, feedback)
-                            print(f"\n📝 Refinement requested: {feedback}")
-                            print("⚠️ Note: Automatic refinement not yet implemented.")
+                        if solution_approval_status == 'approved':
+                            flow.state.record_approval("solution_approved", True, "")
+                            print("\n✅ Solution approved!")
+                        elif solution_approval_status == 'refine':
+                            flow.state.record_approval("solution_approved", False, solution_feedback)
+                            print(f"\n📝 Refinement requested: {solution_feedback}")
+                            print("⚠️ Note: Automatic refinement not yet implemented. Continuing with current solution.")
                         else:
-                            flow.state.record_approval("brief_approved", False, "User rejected")
-                            print("\n⚠️ Product Brief rejected.")
+                            flow.state.record_approval("solution_approved", False, "User rejected")
+                            print("\n⚠️ Solution rejected. Continuing anyway.")
 
-                        print("\n" + "=" * 70)
-                        print("📊 BRIEF REVIEW")
-                        print("=" * 70)
-                        print(doc_result['product_brief']['review_report'])
+                        # Only proceed to Backlog if Solution approved
+                        if solution_approval_status == 'approved':
+                            # ===== PHASE 4: Create Epics & Stories =====
+                            print("\n" + "=" * 70)
+                            print("📋 Moving to PRODUCT BACKLOG creation...")
+                            print("=" * 70)
 
-                        # Display and approve Backlog
-                        backlog_text = doc_result['backlog']['backlog_text']
+                            print("\n📋 Creating Epics & Stories...")
+                            print("This may take a few moments...")
+                            print("-" * 70)
 
-                        print("\n" + "=" * 70)
-                        print("✔️ BACKLOG VALIDATION")
-                        print("=" * 70)
-                        print(doc_result['backlog']['validation_report'])
+                            backlog_result = flow.documentation_phase_backlog()
 
-                        approval_status, feedback = request_approval(
-                            "PRODUCT BACKLOG",
-                            backlog_text,
-                            "backlog_approved"
-                        )
+                            # Display and approve Backlog
+                            backlog_text = backlog_result['backlog_text']
 
-                        if approval_status == 'approved':
-                            flow.state.record_approval("backlog_approved", True, "")
-                            print("\n✅ Product Backlog approved!")
-                        elif approval_status == 'refine':
-                            flow.state.record_approval("backlog_approved", False, feedback)
-                            print(f"\n📝 Refinement requested: {feedback}")
-                            print("⚠️ Note: Automatic refinement not yet implemented.")
+                            print("\n" + "=" * 70)
+                            print("✔️ BACKLOG VALIDATION")
+                            print("=" * 70)
+                            print(backlog_result['validation_report'])
+
+                            backlog_approval_status, backlog_feedback = request_approval(
+                                "PRODUCT BACKLOG",
+                                backlog_text,
+                                "backlog_approved"
+                            )
+
+                            if backlog_approval_status == 'approved':
+                                flow.state.record_approval("backlog_approved", True, "")
+                                print("\n✅ Product Backlog approved!")
+                            elif backlog_approval_status == 'refine':
+                                flow.state.record_approval("backlog_approved", False, backlog_feedback)
+                                print(f"\n📝 Refinement requested: {backlog_feedback}")
+                                print("⚠️ Note: Automatic refinement not yet implemented.")
+                            else:
+                                flow.state.record_approval("backlog_approved", False, "User rejected")
+                                print("\n⚠️ Product Backlog rejected.")
                         else:
-                            flow.state.record_approval("backlog_approved", False, "User rejected")
-                            print("\n⚠️ Product Backlog rejected.")
+                            print("\n⚠️ Skipping Backlog creation because Solution was not approved.")
+                    else:
+                        print("\n⚠️ Skipping Solution and Backlog phases because Brief was not approved.")
 
                     # End session
                     print("\n" + "=" * 70)
@@ -328,7 +333,7 @@ def run():
                     break
 
                 except Exception as e:
-                    print(f"\n❌ Error during solution/documentation phase: {e}")
+                    print(f"\n❌ Error during brief/solution/backlog phases: {e}")
                     import traceback
                     traceback.print_exc()
                     break

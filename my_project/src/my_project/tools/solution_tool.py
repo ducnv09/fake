@@ -45,6 +45,11 @@ class FlowSolutionTool(BaseTool):
             try:
                 component = json.loads(component_data)
                 self.flow.state.solution["screens"].append(component)
+
+                # DEBUG: Log the addition
+                print(f"\n[TOOL DEBUG] Screen added: {component.get('name', 'Unnamed')}")
+                print(f"[TOOL DEBUG] Total screens now: {len(self.flow.state.solution['screens'])}")
+
                 return f"Successfully added screen: {component.get('name', 'Unnamed')}"
             except json.JSONDecodeError as e:
                 return f"Error: Invalid JSON in component_data: {e}"
@@ -93,23 +98,32 @@ Total Solution Elements: {screens_count + services_count + flows_count}"""
             flows_count = len(self.flow.state.solution["business_flows"])
             total_count = screens_count + services_count + flows_count
 
-            # Check completeness criteria
-            if screens_count >= 3 and services_count >= 2 and flows_count >= 2:
+            # Check completeness criteria - flexible based on solution complexity
+            # Basic check: Must have at least some of each component type
+            has_screens = screens_count >= 3
+            has_services = services_count >= 2
+            has_flows = flows_count >= 2
+            has_all_types = has_screens and has_services and has_flows
+
+            # Total count check - sufficient overall coverage
+            has_enough_total = total_count >= 10
+
+            if has_all_types and has_enough_total:
                 status = "COMPLETE"
-                reason = f"Sufficient solution components: {screens_count} screens, {services_count} services, {flows_count} flows"
-            elif total_count >= 7:
-                status = "COMPLETE"
-                reason = f"Total of {total_count} solution components defined"
-            else:
+                reason = f"Solution has all component types and sufficient coverage: {screens_count} screens, {services_count} services, {flows_count} flows"
+            elif not has_all_types:
                 status = "INCOMPLETE"
                 missing = []
                 if screens_count < 3:
-                    missing.append(f"screens ({screens_count}/3)")
+                    missing.append(f"screens ({screens_count}, need at least 3)")
                 if services_count < 2:
-                    missing.append(f"services ({services_count}/2)")
+                    missing.append(f"services ({services_count}, need at least 2)")
                 if flows_count < 2:
-                    missing.append(f"business flows ({flows_count}/2)")
-                reason = f"Need more: {', '.join(missing)}"
+                    missing.append(f"business flows ({flows_count}, need at least 2)")
+                reason = f"Missing component types: {', '.join(missing)}"
+            else:
+                status = "INCOMPLETE"
+                reason = f"Total components ({total_count}) may be insufficient. Consider if all aspects of the Product Brief are covered."
 
             return f"Solution Status: {status}\nReason: {reason}"
 
