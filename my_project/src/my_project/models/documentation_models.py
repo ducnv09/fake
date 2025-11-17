@@ -2,8 +2,8 @@
 Pydantic models for documentation outputs (Product Brief, Epics, Stories)
 """
 
-from pydantic import BaseModel, Field
-from typing import List
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional, Literal
 
 
 class ProductBriefData(BaseModel):
@@ -40,10 +40,14 @@ class EpicData(BaseModel):
     name: str = Field(..., description="Epic name")
     description: str = Field(..., description="What this epic delivers")
     domain: str = Field(..., description="Feature domain (Product/Cart/Order/Payment/etc)")
+    status: str = Field(
+        default="Planned",
+        description="Epic status: Planned/In Progress/Completed"
+    )
 
 
 class StoryData(BaseModel):
-    """Single User Story structure"""
+    """Single User Story structure with INVEST principles"""
     epic_id: str = Field(..., description="ID of the epic this story belongs to")
     title: str = Field(
         ...,
@@ -54,6 +58,52 @@ class StoryData(BaseModel):
         ...,
         description="List of acceptance criteria in Given-When-Then format"
     )
+
+    # INVEST principle fields
+    story_points: int = Field(
+        ...,
+        description="Effort estimation using Fibonacci scale (1,2,3,5,8,13). 1=1 day, 3=3 days, 5=1 week, 8=2 weeks. REQUIRED for INVEST compliance."
+    )
+    priority: Literal["High", "Medium", "Low"] = Field(
+        default="Medium",
+        description="Story priority: High (must have), Medium (should have), Low (nice to have)"
+    )
+    dependencies: List[str] = Field(
+        default_factory=list,
+        description="List of story IDs this story depends on. Keep minimal for Independence principle"
+    )
+
+    @field_validator('story_points')
+    @classmethod
+    def validate_fibonacci(cls, v: int) -> int:
+        """Validate that story_points follows Fibonacci sequence (INVEST: Estimable)"""
+        valid_points = [1, 2, 3, 5, 8, 13]
+        if v not in valid_points:
+            raise ValueError(
+                f"story_points must be one of {valid_points} (Fibonacci scale). "
+                f"Got {v}. Use 1-3 for simple tasks, 5 for complex, 8+ should be split."
+            )
+        if v >= 8:
+            # Warning: story is too large (INVEST: Small)
+            import warnings
+            warnings.warn(
+                f"Story with {v} points is very large. Consider splitting into smaller stories. "
+                f"INVEST principle 'Small' suggests stories should be completable in 1-2 sprints.",
+                UserWarning
+            )
+        return v
+
+    @field_validator('dependencies')
+    @classmethod
+    def validate_dependencies(cls, v: List[str]) -> List[str]:
+        """Validate that dependencies are minimal (INVEST: Independent)"""
+        if len(v) > 3:
+            raise ValueError(
+                f"Story has {len(v)} dependencies. INVEST 'Independent' principle requires "
+                f"minimal dependencies (max 3). Too many dependencies indicate the story "
+                f"should be refactored or split."
+            )
+        return v
 
 
 class BacklogOutput(BaseModel):

@@ -37,11 +37,9 @@ class BAFlowState(BaseModel):
     # ==================== SOLUTION PHASE ====================
     solution: Dict[str, List[Dict]] = Field(
         default_factory=lambda: {
-            "screens": [],           # User-facing screens/pages (not technical components)
-            "services": [],          # Backend business services (not APIs/endpoints)
             "business_flows": []     # User journeys and workflows
         },
-        description="Solution components designed during solution phase (business level, not technical)"
+        description="Solution components designed during solution phase - focused on business flows only"
     )
 
     # ==================== USER INTERACTION ====================
@@ -192,40 +190,6 @@ class BAFlowState(BaseModel):
     def get_solution_text(self) -> str:
         """Get all solution components as formatted text"""
         text = []
-
-        # Screens (User-facing pages/views)
-        if self.solution["screens"]:
-            text.append("## Screens / Pages")
-            for i, screen in enumerate(self.solution["screens"], 1):
-                text.append(f"\n### {i}. {screen.get('name', 'Unnamed Screen')}")
-                if screen.get('purpose'):
-                    text.append(f"**Purpose:** {screen['purpose']}")
-                if screen.get('user_can'):
-                    text.append("**User Can:**")
-                    for action in screen['user_can']:
-                        text.append(f"  - {action}")
-                if screen.get('navigation'):
-                    nav = screen['navigation']
-                    if nav.get('from'):
-                        text.append(f"**Navigate From:** {', '.join(nav['from'])}")
-                    if nav.get('to'):
-                        text.append(f"**Navigate To:** {', '.join(nav['to'])}")
-            text.append("")
-
-        # Services (Backend business services)
-        if self.solution["services"]:
-            text.append("## Backend Services")
-            for i, service in enumerate(self.solution["services"], 1):
-                text.append(f"\n### {i}. {service.get('name', 'Unnamed Service')}")
-                if service.get('purpose'):
-                    text.append(f"**Purpose:** {service['purpose']}")
-                if service.get('responsibilities'):
-                    text.append("**Responsibilities:**")
-                    for resp in service['responsibilities']:
-                        text.append(f"  - {resp}")
-                if service.get('supports_screens'):
-                    text.append(f"**Supports Screens:** {', '.join(service['supports_screens'])}")
-            text.append("")
 
         # Business Flows
         if self.solution["business_flows"]:

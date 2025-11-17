@@ -58,7 +58,7 @@ tôi muốn tạo 1 website bán sách, đại khái giống tiki nhưng đơn g
 
 đang gặp vấn đề là Bán hàng offline gặp hạn chế về mặt bằng, tôi định bán lại sách giấy, website có khách hàng mua sách, trang quản trị danh cho quản lý kho, đơn hàng và nhân viên. tính năng gồm tích hợp thanh toán online, quản lý đơn hàng, hệ thống đánh giá sản phẩm, đánh giá sách, giỏ hàng, thanh toán online, theo dõi đơn hàng. nhóm khách hàng là sinh viên, người đi làm, và mọi đối tượng yêu thích sách. những người sử dụng hệ thống là khách hàng, nhân viên, quản lý kho. thanh toán quét mã qr, nội dung qr là tài khoản ngân hàng của tôi
 
-đọc code của tôi, xem
+
 
 trong trang quản trị, thì theo dõi số lượng từng đầu sách, cảnh báo tồn kho, xuất nhập kho
 
@@ -241,3 +241,31 @@ Lean Kanban là phương pháp quản lý công việc dựa trên nguyên tắc
 
 
   Job Size = ước lượng xem làm cái này mất bao nhiêu công sức so với những item khác.
+
+
+ I - Independent (Độc lập) ⚠️
+  - Không có field để tracking dependencies giữa các stories
+  - Không có mechanism để đảm bảo stories có thể develop độc lập
+
+  N - Negotiable (Có thể thương lượng) ⚠️
+  - Không có field priority/importance
+  - Không có field status (To Do, In Progress, Done)
+  - Không có created_by/updated_by để track conversation với stakeholders
+
+  V - Valuable (Có giá trị) ✅ (Một phần)
+  - Title format yêu cầu "so that [benefit]" → thể hiện value
+  - Nhưng không có field business_value score
+
+  E - Estimable (Có thể ước lượng) ❌
+  - THIẾU story_points/effort estimation
+  - THIẾU complexity level
+
+  S - Small (Nhỏ gọn) ⚠️
+  - Không có constraint về size
+  - Không có field để track nếu story quá lớn cần split
+
+  T - Testable (Có thể kiểm thử) ✅ (Tốt)
+  - Có acceptance_criteria field
+  - Format Given-When-Then được yêu cầu trong tasks.yaml:56
+
+

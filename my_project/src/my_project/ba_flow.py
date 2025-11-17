@@ -3,6 +3,7 @@ Business Analyst Flow - Workflow with Pydantic State Management
 Replaces manual JSON state management with Pydantic-based state
 """
 
+import os
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, task
 from .flow_state import BAFlowState
@@ -10,7 +11,7 @@ from .tools.state_tool import FlowStateTool
 from .tools.solution_tool import FlowSolutionTool
 from .tools.documentation_tool import FlowDocumentationTool
 from .tools.user_interaction_tool import FlowUserInteractionTool
-from .models.solution_models import ScreensOutput, ServicesOutput, FlowsOutput
+from .models.solution_models import FlowsOutput
 from .models.documentation_models import ProductBriefData, BacklogOutput
 
 
@@ -36,6 +37,10 @@ class BAFlow():
 
         # Cache agents to avoid recreation
         self._cached_agents = {}
+
+        # Load model configurations from environment
+        self.strong_model = os.getenv("STRONG_MODEL", "openai/gpt-4.1")
+        self.light_model = os.getenv("LIGHT_MODEL", "openai/gpt-4.1")
 
     # ==================== TOOLS ====================
     @property
@@ -75,7 +80,8 @@ class BAFlow():
                 verbose=True,
                 tools=[],  # No tools - BA will return structured output instead
                 allow_delegation=False,
-                max_iter=15
+                max_iter=15,
+                llm=self.strong_model  # Complex task: gathering requirements
             )
         return self._cached_agents['business_analyst']
 
@@ -85,7 +91,8 @@ class BAFlow():
             self._cached_agents['phase_coordinator'] = Agent(
                 config=self.agents_config['phase_coordinator'],
                 verbose=False,
-                tools=[self.state_tool]
+                tools=[self.state_tool],
+                llm=self.light_model  # Simple task: phase evaluation
             )
         return self._cached_agents['phase_coordinator']
 
@@ -94,7 +101,8 @@ class BAFlow():
         return Agent(
             config=self.agents_config['solution_designer'],
             verbose=True,
-            tools=[]  # Removed solution_tool to enable Pydantic bulk output
+            tools=[],  # Removed solution_tool to enable Pydantic bulk output
+            llm=self.strong_model  # Complex task: designing solutions
         )
 
     @agent
@@ -102,7 +110,8 @@ class BAFlow():
         return Agent(
             config=self.agents_config['solution_validator'],
             verbose=True,
-            tools=[self.solution_tool]
+            tools=[self.solution_tool],
+            llm=self.light_model  # Simple task: validation
         )
 
     @agent
@@ -111,7 +120,8 @@ class BAFlow():
             self._cached_agents['product_brief_writer'] = Agent(
                 config=self.agents_config['product_brief_writer'],
                 verbose=True,
-                tools=[]  # No tools - outputs Pydantic model instead
+                tools=[],  # No tools - outputs Pydantic model instead
+                llm=self.strong_model  # Complex task: writing Product Brief
             )
         return self._cached_agents['product_brief_writer']
 
@@ -121,7 +131,8 @@ class BAFlow():
             self._cached_agents['brief_reviewer'] = Agent(
                 config=self.agents_config['brief_reviewer'],
                 verbose=True,
-                tools=[self.documentation_tool]  # Still needs tool to read brief
+                tools=[self.documentation_tool],  # Still needs tool to read brief
+                llm=self.light_model  # Simple task: review
             )
         return self._cached_agents['brief_reviewer']
 
@@ -131,7 +142,8 @@ class BAFlow():
             self._cached_agents['epic_story_writer'] = Agent(
                 config=self.agents_config['epic_story_writer'],
                 verbose=True,
-                tools=[]  # No tools - outputs Pydantic model instead
+                tools=[],  # No tools - outputs Pydantic model instead
+                llm=self.strong_model  # Complex task: writing Epics & Stories
             )
         return self._cached_agents['epic_story_writer']
 
@@ -141,7 +153,8 @@ class BAFlow():
             self._cached_agents['backlog_validator'] = Agent(
                 config=self.agents_config['backlog_validator'],
                 verbose=True,
-                tools=[self.documentation_tool]
+                tools=[self.documentation_tool],
+                llm=self.light_model  # Simple task: validation
             )
         return self._cached_agents['backlog_validator']
 
@@ -153,20 +166,6 @@ class BAFlow():
     @task
     def phase_evaluation_task(self) -> Task:
         return Task(config=self.tasks_config['phase_evaluation_task'])
-
-    @task
-    def solution_design_screens_task(self) -> Task:
-        return Task(
-            config=self.tasks_config['solution_design_screens_task'],
-            output_pydantic=ScreensOutput
-        )
-
-    @task
-    def solution_design_services_task(self) -> Task:
-        return Task(
-            config=self.tasks_config['solution_design_services_task'],
-            output_pydantic=ServicesOutput
-        )
 
     @task
     def solution_design_flows_task(self) -> Task:
@@ -315,77 +314,29 @@ class BAFlow():
                 print(f"   {reasoning}")
             return "analysis_continue"
 
-    def solution_phase(self):
+    def solution_phase(self, revision_feedback: str = ""):
         """
         Phase 3: Solution Design
-        Runs Designer and Validator to create solution architecture
+        Runs Designer and Validator to create solution architecture (business flows only)
         NOW RUNS AFTER BRIEF - designs HOW to implement the Product Brief
         Called directly from main.py after brief is approved
         """
-        # Transition phase
-        self.state.transition_to_phase("solution", "Product Brief approved, designing solution")
+        # Transition phase (only on first run)
+        if not revision_feedback:
+            self.state.transition_to_phase("solution", "Product Brief approved, designing solution")
 
         # Get requirements and product brief
         requirements_summary = self.state.get_all_requirements_text()
         product_brief = self.state.get_product_brief_text()
 
-        # ===== STEP 1: Design Screens =====
-        print("\n🖥️ Step 1/3: Designing screens/pages...")
-        solution_summary = self.state.get_solution_text()
+        # Get current solution if exists (for refinement context)
+        current_solution = ""
+        if revision_feedback and self.state.solution.get('business_flows'):
+            current_solution = self.state.get_solution_text()
 
-        screens_crew = Crew(
-            agents=[self.solution_designer()],
-            tasks=[self.solution_design_screens_task()],
-            process=Process.sequential,
-            verbose=False
-        )
-
-        screens_result = screens_crew.kickoff(inputs={
-            'requirements_summary': requirements_summary,
-            'product_brief': product_brief,
-            'solution_summary': solution_summary
-        })
-
-        # Get Pydantic output directly from task result
-        screens_output_obj: ScreensOutput = screens_result.pydantic
-
-        # Add all screens from Pydantic model to state
-        for screen in screens_output_obj.screens:
-            self.state.solution["screens"].append(screen.model_dump())
-
-        print(f"✅ Screens designed: {len(screens_output_obj.screens)} screens added")
-        screens_output = str(screens_result.tasks_output[0].raw)
-
-        # ===== STEP 2: Design Services =====
-        print("\n⚙️ Step 2/3: Designing backend services...")
-        solution_summary = self.state.get_solution_text()
-
-        services_crew = Crew(
-            agents=[self.solution_designer()],
-            tasks=[self.solution_design_services_task()],
-            process=Process.sequential,
-            verbose=False
-        )
-
-        services_result = services_crew.kickoff(inputs={
-            'requirements_summary': requirements_summary,
-            'product_brief': product_brief,
-            'solution_summary': solution_summary
-        })
-
-        # Get Pydantic output directly from task result
-        services_output_obj: ServicesOutput = services_result.pydantic
-
-        # Add all services from Pydantic model to state
-        for service in services_output_obj.services:
-            self.state.solution["services"].append(service.model_dump())
-
-        print(f"✅ Services designed: {len(services_output_obj.services)} services added")
-        services_output = str(services_result.tasks_output[0].raw)
-
-        # ===== STEP 3: Design Flows =====
-        print("\n🔄 Step 3/3: Designing business flows...")
-        solution_summary = self.state.get_solution_text()
+        # ===== Design Business Flows =====
+        print("\n🔄 Designing business flows...")
+        solution_summary = self.state.get_solution_text() if not revision_feedback else ""
 
         flows_crew = Crew(
             agents=[self.solution_designer()],
@@ -397,7 +348,9 @@ class BAFlow():
         flows_result = flows_crew.kickoff(inputs={
             'requirements_summary': requirements_summary,
             'product_brief': product_brief,
-            'solution_summary': solution_summary
+            'solution_summary': solution_summary,
+            'revision_feedback': revision_feedback if revision_feedback else "None",
+            'current_solution': current_solution if current_solution else "None"
         })
 
         # Get Pydantic output directly from task result
@@ -410,7 +363,7 @@ class BAFlow():
         print(f"✅ Flows designed: {len(flows_output_obj.business_flows)} flows added")
         flows_output = str(flows_result.tasks_output[0].raw)
 
-        # ===== STEP 4: Validate Solution =====
+        # ===== Validate Solution =====
         print("\n🔍 Validating solution...")
         solution_summary = self.state.get_solution_text()
 
@@ -428,8 +381,8 @@ class BAFlow():
             'validation_results': ""
         })
 
-        # Combine all outputs
-        design_summary = f"{screens_output}\n\n{services_output}\n\n{flows_output}"
+        # Combine outputs
+        design_summary = flows_output
         validation_report = str(validation_result.tasks_output[0].raw)
         phase_evaluation = str(validation_result.tasks_output[1].raw)
 
@@ -512,6 +465,11 @@ class BAFlow():
 
         requirements_summary = self.state.get_all_requirements_text()
 
+        # Get current brief if exists (for refinement context)
+        current_brief = ""
+        if revision_feedback and self.state.documentation.get('product_brief'):
+            current_brief = self.state.get_product_brief_text()
+
         # Create brief crew
         brief_crew = Crew(
             agents=[self.product_brief_writer(), self.brief_reviewer()],
@@ -523,7 +481,8 @@ class BAFlow():
         # Run crew
         result = brief_crew.kickoff(inputs={
             'requirements_summary': requirements_summary,
-            'revision_feedback': revision_feedback if revision_feedback else "None"
+            'revision_feedback': revision_feedback if revision_feedback else "None",
+            'current_brief': current_brief if current_brief else "None"
         })
 
         # Get Pydantic output from FIRST task (Product Brief Writer)
@@ -564,6 +523,11 @@ class BAFlow():
         solution_summary = self.state.get_solution_text()
         product_brief = self.state.get_product_brief_text()
 
+        # Get current backlog if exists (for refinement context)
+        current_backlog = ""
+        if revision_feedback and (self.state.documentation.get('epics') or self.state.documentation.get('stories')):
+            current_backlog = self.state.get_backlog_text()
+
         # Create backlog crew
         backlog_crew = Crew(
             agents=[self.epic_story_writer(), self.backlog_validator()],
@@ -576,7 +540,8 @@ class BAFlow():
         result = backlog_crew.kickoff(inputs={
             'solution_summary': solution_summary,
             'product_brief': product_brief,
-            'revision_feedback': revision_feedback if revision_feedback else "None"
+            'revision_feedback': revision_feedback if revision_feedback else "None",
+            'current_backlog': current_backlog if current_backlog else "None"
         })
 
         # Get Pydantic output from FIRST task (Epic & Story Writer)

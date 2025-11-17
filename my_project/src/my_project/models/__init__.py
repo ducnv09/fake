@@ -3,13 +3,8 @@ Models package for solution design and documentation outputs
 """
 
 from .solution_models import (
-    ScreenDesign,
-    ScreensOutput,
-    ServiceDesign,
-    ServicesOutput,
     FlowDesign,
-    FlowsOutput,
-    NavigationInfo
+    FlowsOutput
 )
 
 from .documentation_models import (
@@ -21,13 +16,8 @@ from .documentation_models import (
 
 __all__ = [
     # Solution models
-    'ScreenDesign',
-    'ScreensOutput',
-    'ServiceDesign',
-    'ServicesOutput',
     'FlowDesign',
     'FlowsOutput',
-    'NavigationInfo',
     # Documentation models
     'ProductBriefData',
     'EpicData',

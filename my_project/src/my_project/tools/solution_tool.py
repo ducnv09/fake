@@ -11,22 +11,20 @@ import json
 
 class SolutionToolInput(BaseModel):
     """Input schema for FlowSolutionTool"""
-    action: str = Field(..., description="Action to perform: 'add_screen', 'add_service', 'add_flow', 'get_solution', 'get_summary', 'check_complete'")
+    action: str = Field(..., description="Action to perform: 'add_flow', 'get_solution', 'get_summary', 'check_complete'")
     component_data: Optional[str] = Field(None, description="JSON string of component data (for add actions)")
 
 
 class FlowSolutionTool(BaseTool):
     name: str = "Solution Manager Tool"
     description: str = """
-    Tool to manage BUSINESS-LEVEL solution components (NOT technical implementation). Use this to:
-    - Add screen/page: action='add_screen', component_data='{"name": "Home Page", "purpose": "Landing page for users", "user_can": ["Browse items", "Search"], "navigation": {"from": [...], "to": [...]}}'
-    - Add backend service: action='add_service', component_data='{"name": "Product Management Service", "purpose": "Manage product catalog", "responsibilities": ["Maintain products", "Track inventory"], "supports_screens": [...]}'
+    Tool to manage BUSINESS-LEVEL solution components (business flows and user journeys). Use this to:
     - Add business flow: action='add_flow', component_data='{"name": "Purchase Flow", "description": "...", "steps": [...], "actors": [...]}'
     - Get solution: action='get_solution'
     - Get summary: action='get_summary'
     - Check if solution complete: action='check_complete'
 
-    IMPORTANT: Focus on BUSINESS aspects, NOT technical implementation (no HTTP endpoints, no database schemas, no framework details)
+    IMPORTANT: Focus on USER JOURNEYS and BUSINESS PROCESSES, NOT technical implementation
     """
     args_schema: Type[BaseModel] = SolutionToolInput
     flow: Any = Field(default=None, exclude=True)
@@ -38,34 +36,7 @@ class FlowSolutionTool(BaseTool):
     def _run(self, action: str, component_data: Optional[str] = None) -> str:
         """Execute the tool action"""
 
-        if action == "add_screen":
-            if not component_data:
-                return "Error: 'add_screen' requires 'component_data'"
-
-            try:
-                component = json.loads(component_data)
-                self.flow.state.solution["screens"].append(component)
-
-                # DEBUG: Log the addition
-                print(f"\n[TOOL DEBUG] Screen added: {component.get('name', 'Unnamed')}")
-                print(f"[TOOL DEBUG] Total screens now: {len(self.flow.state.solution['screens'])}")
-
-                return f"Successfully added screen: {component.get('name', 'Unnamed')}"
-            except json.JSONDecodeError as e:
-                return f"Error: Invalid JSON in component_data: {e}"
-
-        elif action == "add_service":
-            if not component_data:
-                return "Error: 'add_service' requires 'component_data'"
-
-            try:
-                component = json.loads(component_data)
-                self.flow.state.solution["services"].append(component)
-                return f"Successfully added service: {component.get('name', 'Unnamed')}"
-            except json.JSONDecodeError as e:
-                return f"Error: Invalid JSON in component_data: {e}"
-
-        elif action == "add_flow":
+        if action == "add_flow":
             if not component_data:
                 return "Error: 'add_flow' requires 'component_data'"
 
@@ -80,55 +51,29 @@ class FlowSolutionTool(BaseTool):
             return self.flow.state.get_solution_text()
 
         elif action == "get_summary":
-            screens_count = len(self.flow.state.solution["screens"])
-            services_count = len(self.flow.state.solution["services"])
             flows_count = len(self.flow.state.solution["business_flows"])
 
             summary = f"""Solution Components:
-- Screens/Pages: {screens_count} items
-- Backend Services: {services_count} items
 - Business Flows: {flows_count} items
 
-Total Solution Elements: {screens_count + services_count + flows_count}"""
+Total Solution Elements: {flows_count}"""
             return summary
 
         elif action == "check_complete":
-            screens_count = len(self.flow.state.solution["screens"])
-            services_count = len(self.flow.state.solution["services"])
             flows_count = len(self.flow.state.solution["business_flows"])
-            total_count = screens_count + services_count + flows_count
 
-            # Check completeness criteria - flexible based on solution complexity
-            # Basic check: Must have at least some of each component type
-            has_screens = screens_count >= 3
-            has_services = services_count >= 2
-            has_flows = flows_count >= 2
-            has_all_types = has_screens and has_services and has_flows
-
-            # Total count check - sufficient overall coverage
-            has_enough_total = total_count >= 10
-
-            if has_all_types and has_enough_total:
+            # Check completeness criteria - require at least 2 flows
+            if flows_count >= 2:
                 status = "COMPLETE"
-                reason = f"Solution has all component types and sufficient coverage: {screens_count} screens, {services_count} services, {flows_count} flows"
-            elif not has_all_types:
-                status = "INCOMPLETE"
-                missing = []
-                if screens_count < 3:
-                    missing.append(f"screens ({screens_count}, need at least 3)")
-                if services_count < 2:
-                    missing.append(f"services ({services_count}, need at least 2)")
-                if flows_count < 2:
-                    missing.append(f"business flows ({flows_count}, need at least 2)")
-                reason = f"Missing component types: {', '.join(missing)}"
+                reason = f"Solution has sufficient business flows: {flows_count} flows defined"
             else:
                 status = "INCOMPLETE"
-                reason = f"Total components ({total_count}) may be insufficient. Consider if all aspects of the Product Brief are covered."
+                reason = f"Need more business flows ({flows_count}, need at least 2)"
 
             return f"Solution Status: {status}\nReason: {reason}"
 
         else:
-            return f"Error: Unknown action '{action}'. Valid actions: add_screen, add_service, add_flow, get_solution, get_summary, check_complete"
+            return f"Error: Unknown action '{action}'. Valid actions: add_flow, get_solution, get_summary, check_complete"
 
 
 # ==================== LEGACY: For backward compatibility with old crew.py ====================

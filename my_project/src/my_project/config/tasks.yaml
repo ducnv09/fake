@@ -112,95 +112,11 @@ phase_evaluation_task:
     NEXT_STEPS: [What should happen next - either move to Solution phase or what questions still need answers]
   agent: phase_coordinator
 
-# ==================== SOLUTION DESIGN PHASE - BROKEN INTO 3 SEQUENTIAL TASKS ====================
-
-solution_design_screens_task:
-  description: >
-    TASK 1/3: Design all user-facing SCREENS/PAGES for the solution.
-
-    CRITICAL: You are a BUSINESS ANALYST, NOT a technical architect.
-    Focus on WHAT the solution does for users, NOT HOW it's technically implemented.
-
-    Product Brief (defines WHAT to build):
-    {product_brief}
-
-    Requirements to analyze:
-    {requirements_summary}
-
-    YOUR JOB: Analyze the Product Brief and identify ALL screens needed.
-
-    STEP 1 - ANALYZE AND PLAN:
-    Review the Product Brief and Requirements to identify ALL screens needed:
-    - What screens do CUSTOMERS need? (e.g., browse products, view details, checkout, track orders)
-    - What screens do ADMINS need? (e.g., manage inventory, view reports, manage orders)
-    - What screens do EMPLOYEES need? (e.g., add products, update stock)
-
-    STEP 2 - DESIGN SCREENS:
-    For each screen, define:
-    - name: Screen name (e.g., "Home Page", "Admin Dashboard")
-    - purpose: What this screen does from business perspective
-    - user_can: Array of actions users can perform
-    - navigation: Object with "from" and "to" arrays showing navigation paths
-
-    CRITICAL RULES:
-    - Design ALL screens at once
-    - DO NOT include technical details (React, Vue, Redux, etc.)
-    - Focus on USER PERSPECTIVE: What can users DO on this screen?
-    - Your output will be automatically parsed as ScreensOutput Pydantic model
-  expected_output: >
-    A complete list of all screens in the solution. Each screen must have:
-    - name: Screen name
-    - purpose: Business purpose
-    - user_can: List of user actions
-    - navigation: Navigation paths (from/to)
-  agent: solution_designer
-
-solution_design_services_task:
-  description: >
-    TASK 2/3: Design all BACKEND SERVICES for the solution.
-
-    CRITICAL: You are a BUSINESS ANALYST, NOT a technical architect.
-
-    Product Brief (defines WHAT to build):
-    {product_brief}
-
-    Requirements to analyze:
-    {requirements_summary}
-
-    Screens already designed:
-    {solution_summary}
-
-    YOUR JOB: Analyze the Product Brief and screens, identify ALL backend services needed.
-
-    STEP 1 - ANALYZE AND PLAN:
-    Review the Product Brief, Requirements, and Screens to identify ALL backend services needed:
-    - What business functions need to be handled? (e.g., manage products, process orders, handle payments)
-    - What data needs to be managed? (e.g., user data, inventory, orders)
-    - What services support the screens you designed?
-
-    STEP 2 - DESIGN SERVICES:
-    For each service, define:
-    - name: Service name (e.g., "Product Management Service")
-    - purpose: What this service does from business perspective
-    - responsibilities: Array of business responsibilities
-    - supports_screens: Array of screen names this service supports
-
-    CRITICAL RULES:
-    - Design ALL services at once
-    - DO NOT include technical details (API endpoints, database schemas, REST/GraphQL, SQL/NoSQL)
-    - Focus on BUSINESS RESPONSIBILITIES: What business functions does this service handle?
-    - Your output will be automatically parsed as ServicesOutput Pydantic model
-  expected_output: >
-    A complete list of all backend services in the solution. Each service must have:
-    - name: Service name
-    - purpose: Business purpose
-    - responsibilities: List of business responsibilities
-    - supports_screens: List of screen names
-  agent: solution_designer
+# ==================== SOLUTION DESIGN PHASE - SINGLE TASK FOR FLOWS ====================
 
 solution_design_flows_task:
   description: >
-    TASK 3/3: Design all BUSINESS FLOWS (user journeys) for the solution.
+    Design all BUSINESS FLOWS (user journeys) for the solution.
 
     CRITICAL: You are a BUSINESS ANALYST, NOT a technical architect.
 
@@ -210,16 +126,27 @@ solution_design_flows_task:
     Requirements to analyze:
     {requirements_summary}
 
-    Solution components already designed:
-    {solution_summary}
+    Current Solution (if refining):
+    {current_solution}
+
+    Revision Feedback (if any):
+    {revision_feedback}
 
     YOUR JOB: Analyze the Product Brief and identify ALL major user journeys/workflows.
 
+    REFINEMENT MODE: If current_solution is provided (not "None"), you are in REFINEMENT mode.
+    In this mode, you must:
+    1. Read the current_solution carefully to understand existing business flows
+    2. Read the revision_feedback to understand what needs to be changed
+    3. Make ONLY the changes requested in revision_feedback
+    4. Keep all other flows EXACTLY as they were
+    5. Example: If feedback says "ở luồng đăng ký, không cần thêm xác nhận đồng ý điều khoản" → Remove that step from the registration flow, keep other flows unchanged
+
     STEP 1 - ANALYZE AND PLAN:
-    Review the Product Brief and solution components to identify ALL major flows needed:
+    Review the Product Brief to identify ALL major flows needed:
     - What are the main user journeys? (e.g., customer purchasing a book, admin managing inventory)
     - What are the key workflows that achieve product goals?
-    - What processes involve multiple screens and services?
+    - What processes span across the system?
 
     STEP 2 - DESIGN FLOWS:
     For each flow, define:
@@ -227,6 +154,23 @@ solution_design_flows_task:
     - description: What this flow accomplishes
     - steps: Array of detailed steps from start to finish
     - actors: Array of actors involved (users, systems, external services)
+
+    CRITICAL REFINEMENT INSTRUCTIONS:
+    If you are in REFINEMENT MODE (current_solution is not "None"):
+    - START with the current_solution as your base
+    - ONLY change the specific flow(s) mentioned in revision_feedback
+    - If feedback says "ở luồng X, bỏ step Y" → Find flow X, remove step Y, keep ALL other flows unchanged
+    - If feedback says "thêm luồng Z" → Add flow Z, keep ALL other flows unchanged
+    - If feedback says "sửa luồng A" → Modify flow A as requested, keep ALL other flows unchanged
+    - DO NOT regenerate all flows - just apply the specific changes
+    - All unchanged flows must remain IDENTICAL to current_solution
+
+    CRITICAL LANGUAGE REQUIREMENT:
+    You MUST write ALL business flows in the SAME LANGUAGE as the Product Brief.
+    - If the Product Brief is in Vietnamese (Tiếng Việt), write ALL flow names, descriptions, steps, and actors in Vietnamese.
+    - If the Product Brief is in English, write ALL flow names, descriptions, steps, and actors in English.
+    - Check the language of the Product Brief carefully and use that exact language.
+    - DO NOT translate or mix languages. Maintain 100% language consistency.
 
     CRITICAL RULES:
     - Design ALL flows at once
@@ -269,11 +213,9 @@ solution_validation_task:
 
     STEP 3 - ANALYZE:
     - Does the solution support all Product Goals defined in the Brief?
-    - Does every requirement have corresponding solution components?
-    - Are all Target Users from the Brief considered in the solution?
+    - Does every requirement have corresponding business flows?
+    - Are all Target Users from the Brief considered in the flows?
     - Does the solution stay within the defined Scope from the Brief?
-    - Are all user-facing features covered by screens/pages?
-    - Are all business logic needs covered by backend services?
     - Are major user journeys documented as business flows?
     - Are there any gaps or missing pieces?
 
@@ -282,17 +224,21 @@ solution_validation_task:
 
     If gaps found: Clearly identify what's missing and recommend additions.
     If complete: Confirm solution is ready for backlog creation.
+
+    CRITICAL LANGUAGE REQUIREMENT:
+    You MUST write your validation report in the SAME LANGUAGE as the Product Brief and Solution being validated.
+    - If the Product Brief and Solution are in Vietnamese (Tiếng Việt), write your ENTIRE validation report in Vietnamese.
+    - If the Product Brief and Solution are in English, write your ENTIRE validation report in English.
+    - DO NOT translate or mix languages. Maintain 100% language consistency.
   expected_output: >
     A validation report in this EXACT format:
 
     VALIDATION STATUS: [COMPLETE or INCOMPLETE]
 
     COVERAGE ANALYSIS:
-    - Screens: [Assessment of screens/pages coverage - do they cover all user-facing features?]
-    - Services: [Assessment of backend services coverage - do they support all business logic?]
-    - Flows: [Assessment of business flows coverage - are all user journeys documented?]
+    - Business Flows: [Assessment of business flows coverage - do they cover all user journeys and product goals?]
 
-    GAPS IDENTIFIED: [List any missing components or flows, or "None" if complete]
+    GAPS IDENTIFIED: [List any missing flows or "None" if complete]
 
     RECOMMENDATION: [What should happen next]
 
@@ -314,11 +260,9 @@ solution_phase_evaluation_task:
     {validation_results}
 
     Decision criteria:
-    - At least 3 screens/pages defined
-    - At least 2 backend services defined
     - At least 2 business flows documented
-    - OR at least 7 total solution elements
-    - All major requirements have corresponding solution components
+    - OR at least 3 total solution elements
+    - All major requirements have corresponding business flows
 
     If ready: Recommend moving to Documentation phase.
     If not ready: Identify what still needs to be designed.
@@ -340,10 +284,21 @@ product_brief_creation_task:
     Requirements:
     {requirements_summary}
 
+    Current Product Brief (if refining):
+    {current_brief}
+
     Revision Feedback (if any):
     {revision_feedback}
 
     YOUR JOB: Analyze requirements and create a Product Brief with all required sections.
+
+    REFINEMENT MODE: If current_brief is provided (not "None"), you are in REFINEMENT mode.
+    In this mode, you must:
+    1. Read the current_brief carefully to understand what already exists
+    2. Read the revision_feedback to understand what needs to be changed
+    3. Make ONLY the changes requested in revision_feedback
+    4. Keep all other sections EXACTLY as they were in current_brief
+    5. Example: If feedback says "bỏ X ở OUT OF SCOPE" → Remove X from OUT OF SCOPE section
 
     STEP 1 - ANALYZE REQUIREMENTS:
     Review the requirements gathered during the analysis phase.
@@ -371,7 +326,22 @@ product_brief_creation_task:
     - Product Goals: Format as numbered list with clear, measurable goals
     - Scope: Clearly separate IN SCOPE and OUT OF SCOPE sections
 
-    If revision_feedback is provided, focus on addressing the specific feedback while keeping other sections intact.
+    CRITICAL REFINEMENT INSTRUCTIONS:
+    If you are in REFINEMENT MODE (current_brief is not "None"):
+    - START with the current_brief as your base
+    - ONLY change what is explicitly mentioned in revision_feedback
+    - If feedback says "bỏ X" or "remove X" → DELETE X from the document
+    - If feedback says "thêm Y" or "add Y" → ADD Y to the document
+    - If feedback says "sửa Z thành W" or "change Z to W" → REPLACE Z with W
+    - DO NOT rewrite or regenerate the entire brief - just apply the changes
+    - All unchanged sections must remain IDENTICAL to current_brief
+
+    CRITICAL LANGUAGE REQUIREMENT:
+    You MUST write the Product Brief in the SAME LANGUAGE as the requirements above.
+    - If the requirements are in Vietnamese (Tiếng Việt), write the ENTIRE Product Brief in Vietnamese.
+    - If the requirements are in English, write the ENTIRE Product Brief in English.
+    - Check the language of the {requirements_summary} carefully and use that exact language.
+    - DO NOT translate or mix languages. Maintain 100% language consistency.
 
     IMPORTANT: ALL fields are REQUIRED and must be filled with meaningful content based on requirements.
     Do NOT leave any field empty or with placeholder text.
@@ -405,6 +375,12 @@ product_brief_review_task:
     STEP 3 - PROVIDE REVIEW:
     Based on your evaluation, provide the final review report (do NOT make more tool calls after this).
     Provide specific, actionable feedback for improvements.
+
+    CRITICAL LANGUAGE REQUIREMENT:
+    You MUST write your review in the SAME LANGUAGE as the Product Brief you are reviewing.
+    - If the Product Brief is in Vietnamese (Tiếng Việt), write your ENTIRE review in Vietnamese.
+    - If the Product Brief is in English, write your ENTIRE review in English.
+    - DO NOT translate or mix languages. Maintain 100% language consistency with the document.
   expected_output: >
     A review report in this EXACT format:
 
@@ -421,18 +397,29 @@ product_brief_review_task:
 
 epic_story_creation_task:
   description: >
-    Create Epics and User Stories based on the Product Brief and Solution Design, organized by feature domain.
+    Create Epics and User Stories based on the Product Brief and Business Flows, organized by feature domain.
 
     Product Brief:
     {product_brief}
 
-    Solution Design:
+    Business Flows (from Solution Design):
     {solution_summary}
+
+    Current Product Backlog (if refining):
+    {current_backlog}
 
     Revision Feedback (if any):
     {revision_feedback}
 
-    YOUR JOB: Design comprehensive Epics and User Stories that cover all solution components.
+    YOUR JOB: Design comprehensive Epics and User Stories based on user goals and journeys.
+
+    REFINEMENT MODE: If current_backlog is provided (not "None"), you are in REFINEMENT mode.
+    In this mode, you must:
+    1. Read the current_backlog carefully to understand existing epics and stories
+    2. Read the revision_feedback to understand what needs to be changed
+    3. Make ONLY the changes requested in revision_feedback
+    4. Keep all other epics and stories EXACTLY as they were
+    5. Example: If feedback says "thêm story cho X" → Add story for X, keep others unchanged
 
     STEP 1 - UNDERSTAND PRODUCT CONTEXT:
     Review the Product Brief to understand:
@@ -441,19 +428,27 @@ epic_story_creation_task:
     - Product Goals: What are the success criteria?
     - Scope: What's in-scope vs out-of-scope?
 
-    STEP 2 - IDENTIFY FEATURE DOMAINS:
-    Based on solution components and product goals, identify 3-5 major feature domains (e.g., Product Management, Cart, Order, Payment, User Management).
+    STEP 2 - ANALYZE BUSINESS FLOWS:
+    Review the Business Flows to understand:
+    - What are the main user journeys?
+    - What steps do users take to achieve their goals?
+    - What value does each flow provide?
 
-    STEP 3 - DESIGN EPICS:
+    STEP 3 - IDENTIFY FEATURE DOMAINS:
+    Based on Product Goals and user journeys, identify 3-5 major feature domains (e.g., Product Discovery, Shopping Cart, Order Management, Payment Processing).
+
+    STEP 4 - DESIGN EPICS:
     For EACH feature domain, create an Epic with:
     - id: Epic ID (e.g., "epic-1", "epic-2")
     - name: Epic name
     - description: What this epic delivers
     - domain: Feature domain name
 
-    STEP 4 - DESIGN USER STORIES:
-    For EACH frontend component, backend API, and business flow, create 2-3 User Stories.
+    STEP 5 - DESIGN USER STORIES:
+    For EACH business flow step, create User Stories that enable that step.
     IMPORTANT: Consider Target Users from Product Brief when writing stories (use correct roles like "customer", "admin", "warehouse manager").
+
+    APPLY INVEST PRINCIPLES TO EVERY STORY:
 
     Each story must have:
     - epic_id: ID of the epic this story belongs to
@@ -461,12 +456,46 @@ epic_story_creation_task:
     - description: Detailed description of the story
     - acceptance_criteria: List of criteria in Given-When-Then format
 
-    Target: Create at least 10-15 user stories total covering all solution components.
+    INVEST FIELDS (REQUIRED):
+    - story_points: Estimate using Fibonacci (1,2,3,5,8,13). Use estimation guide from your backstory.
+        - 1 = 1 day (simple UI, basic CRUD)
+        - 2 = 2 days (standard feature)
+        - 3 = 3 days (some complexity)
+        - 5 = 1 week (complex feature)
+        - 8 = 2 weeks (very complex - consider splitting)
+        - 13 = TOO LARGE (MUST split into smaller stories)
+    - priority: Assign based on Product Goals
+        - High: Must have for MVP, critical to goals, blocking
+        - Medium: Should have, important but not critical
+        - Low: Nice to have, can defer
+    - dependencies: List story IDs this depends on (keep MINIMAL for Independence)
+        - Try to have 0 dependencies
+        - Max 2-3 dependencies per story
+        - Avoid circular dependencies
+
+    Target: Create at least 10-15 user stories total covering all business flows and product goals.
     Ensure stories align with Product Goals and stay within defined Scope.
 
-    If revision_feedback is provided, focus on addressing specific gaps or changes requested.
+    CRITICAL REFINEMENT INSTRUCTIONS:
+    If you are in REFINEMENT MODE (current_backlog is not "None"):
+    - START with the current_backlog as your base
+    - ONLY change what is explicitly mentioned in revision_feedback
+    - If feedback says "bỏ epic X" or "remove epic X" → DELETE epic X
+    - If feedback says "thêm story Y" or "add story Y" → ADD story Y
+    - If feedback says "sửa story Z" or "modify story Z" → MODIFY story Z as requested
+    - DO NOT regenerate the entire backlog - just apply the changes
+    - All unchanged epics and stories must remain IDENTICAL
 
-    IMPORTANT: Create comprehensive epics and stories covering ALL solution components.
+    CRITICAL LANGUAGE REQUIREMENT:
+    You MUST write Epics and User Stories in the SAME LANGUAGE as the Product Brief and Requirements.
+    - If the Product Brief is in Vietnamese (Tiếng Việt), write ALL epics and stories in Vietnamese.
+    - If the Product Brief is in English, write ALL epics and stories in English.
+    - Check the language of the Product Brief carefully and use that exact language.
+    - User story format: "Với vai trò [role], tôi muốn [feature] để [benefit]" (Vietnamese) or "As a [role], I want [feature] so that [benefit]" (English)
+    - DO NOT translate or mix languages. Maintain 100% language consistency.
+
+    IMPORTANT: Create comprehensive epics and stories covering ALL user journeys and product goals.
+    Every story MUST have story_points and priority assigned.
   expected_output: >
     A complete backlog with both epics and stories.
     Output format:
@@ -478,7 +507,7 @@ epic_story_creation_task:
 
 backlog_validation_task:
   description: >
-    Validate that Epics and Stories comprehensively cover the Product Brief scope and solution design.
+    Validate that Epics and Stories comprehensively cover the Product Brief scope and business flows.
 
     STEP 1 - GET DOCUMENTATION:
     Use the Documentation Manager Tool to get current documentation:
@@ -489,11 +518,11 @@ backlog_validation_task:
     Product Brief:
     {product_brief}
 
-    Solution Design:
+    Business Flows (Solution Design):
     {solution_summary}
 
     STEP 2 - ANALYZE COVERAGE:
-    - Does every solution component (frontend/backend/flow) have corresponding user stories?
+    - Does every business flow have corresponding user stories?
     - Are epics properly organized by feature domain?
     - Do all stories align with Target Users defined in Product Brief?
     - Do stories support Product Goals?
@@ -502,8 +531,55 @@ backlog_validation_task:
     - Do all stories have clear acceptance criteria?
     - Are there any gaps or missing stories?
 
+    STEP 2.5 - VALIDATE INVEST COMPLIANCE (CRITICAL):
+    For EVERY story, check:
+
+    1. INDEPENDENT - Dependencies check:
+       - Count dependencies per story
+       - Flag stories with >3 dependencies as "too coupled"
+       - Check for circular dependencies (A→B→A)
+       - Recommend refactoring if many stories are interdependent
+
+    2. NEGOTIABLE - Priority check:
+       - Verify ALL stories have priority field
+       - Check priority is one of: High, Medium, Low
+       - Flag stories missing priority
+
+    3. VALUABLE - Value check:
+       - Verify story title includes "so that [benefit]"
+       - Check benefit aligns with Product Goals
+
+    4. ESTIMABLE - Story points check:
+       - Verify ALL stories have story_points field
+       - Check story_points is valid Fibonacci: 1, 2, 3, 5, 8, 13
+       - Flag stories missing story_points
+       - Flag invalid estimates (not Fibonacci)
+
+    5. SMALL - Size check:
+       - Flag stories with 8 points as "Large - consider splitting"
+       - Flag stories with 13 points as "TOO LARGE - MUST split"
+
+    6. TESTABLE - Acceptance criteria check:
+       - Verify all stories have acceptance_criteria
+       - Check criteria follow Given-When-Then format
+
+    INVEST RED FLAGS (report these in validation):
+    - Stories missing story_points
+    - Stories with invalid story_points (e.g., 4, 6, 7, 10)
+    - Stories with 8+ points (too large)
+    - Stories missing priority
+    - Stories with >3 dependencies
+    - Circular dependencies detected
+    - Missing acceptance criteria
+
     STEP 3 - PROVIDE VALIDATION:
     Based on your analysis, provide the final validation report (do NOT make more tool calls after this).
+
+    CRITICAL LANGUAGE REQUIREMENT:
+    You MUST write your validation report in the SAME LANGUAGE as the Epics and Stories you are validating.
+    - If the Epics and Stories are in Vietnamese (Tiếng Việt), write your ENTIRE validation report in Vietnamese.
+    - If the Epics and Stories are in English, write your ENTIRE validation report in English.
+    - DO NOT translate or mix languages. Maintain 100% language consistency with the backlog.
   expected_output: >
     A validation report in this EXACT format:
 
@@ -514,9 +590,25 @@ backlog_validation_task:
     - Stories: [Assessment of story coverage]
     - Acceptance Criteria: [Assessment of criteria quality]
 
+    INVEST COMPLIANCE:
+    - Independent: [Number of stories with 0 deps / 1-3 deps / >3 deps. Any circular dependencies?]
+    - Negotiable: [Number of stories with priority assigned vs missing. Priority distribution High/Medium/Low]
+    - Valuable: [Do story titles show clear benefits? Alignment with Product Goals?]
+    - Estimable: [Number of stories with story_points vs missing. Any invalid estimates?]
+    - Small: [Number of stories by size: 1-3pts / 5pts / 8pts / 13pts. Flag large stories]
+    - Testable: [All stories have acceptance criteria? Given-When-Then format?]
+
+    INVEST RED FLAGS: [List any violations or "None" if all pass]
+    - Stories missing story_points: [list IDs or "None"]
+    - Stories with invalid story_points: [list IDs or "None"]
+    - Stories too large (8+ points): [list IDs or "None"]
+    - Stories missing priority: [list IDs or "None"]
+    - Stories with >3 dependencies: [list IDs or "None"]
+    - Circular dependencies: [describe or "None"]
+
     GAPS IDENTIFIED: [List any missing stories or epics, or "None" if complete]
 
-    RECOMMENDATIONS: [What should be added or improved]
+    RECOMMENDATIONS: [What should be added or improved, including INVEST fixes]
 
     CRITICAL: After providing this validation, your task is COMPLETE. Do NOT make additional tool calls.
   agent: backlog_validator
