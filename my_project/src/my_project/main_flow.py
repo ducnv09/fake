@@ -302,8 +302,7 @@ def run():
                                 flow.state.record_approval("solution_approved", False, solution_feedback)
                                 print(f"\n📝 Refinement requested: {solution_feedback}")
 
-                                # Clear business flows before refining
-                                flow.state.solution['business_flows'] = []
+                                # Note: business_flows will be cleared in solution_phase() after capturing current state
 
                                 if solution_revision_count >= max_solution_revisions:
                                     print(f"\n⚠️ Maximum revisions ({max_solution_revisions}) reached. Using current version.")

@@ -333,6 +333,8 @@ class BAFlow():
         current_solution = ""
         if revision_feedback and self.state.solution.get('business_flows'):
             current_solution = self.state.get_solution_text()
+            # Clear flows AFTER capturing current state for refinement context
+            self.state.solution['business_flows'] = []
 
         # ===== Design Business Flows =====
         print("\n🔄 Designing business flows...")
