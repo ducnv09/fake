@@ -529,6 +529,9 @@ class BAFlow():
         current_backlog = ""
         if revision_feedback and (self.state.documentation.get('epics') or self.state.documentation.get('stories')):
             current_backlog = self.state.get_backlog_text()
+            # Clear epics and stories AFTER capturing current state for refinement context
+            self.state.documentation['epics'] = []
+            self.state.documentation['stories'] = []
 
         # Create backlog crew
         backlog_crew = Crew(

@@ -352,9 +352,7 @@ def run():
                                     flow.state.record_approval("backlog_approved", False, backlog_feedback)
                                     print(f"\n📝 Refinement requested: {backlog_feedback}")
 
-                                    # Clear epics and stories before refining
-                                    flow.state.documentation['epics'] = []
-                                    flow.state.documentation['stories'] = []
+                                    # Note: epics and stories will be cleared in _run_backlog_phase() after capturing current state
 
                                     if backlog_revision_count >= max_backlog_revisions:
                                         print(f"\n⚠️ Maximum revisions ({max_backlog_revisions}) reached. Using current version.")
